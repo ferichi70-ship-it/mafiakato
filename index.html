@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+
+<html lang="uk">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Рейтинг</title>
+<style>
+  :root{
+   --bg:#0b0f14;
+   --card:#111826;
+   --muted:#a7b0be;
+   --text:#e8eef8;
+   --line:#243246;
+   --accent:#3b82f6;
+   --danger:#ef4444;
+   --ok:#22c55e;
+  }
+  *{ box-sizing:border-box; }
+  body{
+   margin:0;
+   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+   background:var(--bg);
+   color:var(--text);
+  }
+  a{ color:var(--accent); text-decoration:none; }
+  a:hover{ text-decoration:underline; }
+  .app{
+   max-width: 980px;
+   margin: 0 auto;
+   padding: 18px 14px 40px;
+  }
+  h1{
+   margin: 10px 0 14px;
+   font-size: 22px;
+   font-weight: 700;
+  }
+  .muted{ color:var(--muted); }
+  .card{
+   background:var(--card);
+   border:1px solid var(--line);
+   border-radius:14px;
+   padding: 14px;
+  }
+  .authbar{
+   display:flex;
+   gap:10px;
+   align-items:center;
+   justify-content:space-between;
+   margin: 10px 0 14px;
+   flex-wrap: wrap;
+  }
+  .authbar .left{
+   display:flex;
+   gap:10px;
+   align-items:center;
+   flex-wrap: wrap;
+  }
+  button{
+   height: 40px;
+   padding: 0 14px;
+   border-radius: 10px;
+   border: 1px solid var(--line);
+   background: transparent;
+   color: var(--text);
+   cursor: pointer;
+   font-weight: 600;
+  }
+  button.primary{
+   background: var(--accent);
+   border-color: transparent;
+   color: white;
+  }
+  button:hover{ filter: brightness(1.05); }
+  input, select{
+   height: 40px;
+   padding: 0 12px;
+   border-radius: 10px;
+   border: 1px solid var(--line);
+   background: #0f1520;
+   color: var(--text);
+   outline: none;
+   min-width: 210px;
+  }
+  .row{
+   display:flex;
+   gap: 12px;
+   align-items: center;
+   flex-wrap: wrap;
+   margin-bottom: 10px;
+  }
+  .label{ font-size: 13px; color: var(--muted); margin-right: 6px; }
+  .pill{
+   display:inline-flex;
+   align-items:center;
+   gap:8px;
+   padding: 6px 10px;
+   border-radius: 999px;
+   background: #0f1520;
+   border: 1px solid var(--line);
+   color: var(--muted);
+   font-size: 13px;
+   white-space: nowrap;
+  }
+  table{
+   width:100%;
+   border-collapse: collapse;
+   margin-top: 8px;
+   overflow:hidden;
+   border-radius: 12px;
+   border: 1px solid var(--line);
+  }
+  th, td{
+   padding: 10px 10px;
+   border-bottom: 1px solid var(--line);
+   text-align: left;
+   font-size: 14px;
+   vertical-align: top;
+  }
+  th{
+   font-size: 13px;
+   color: var(--muted);
+   font-weight: 700;
+   background: #0f1520;
+   position: sticky;
+   top: 0;
+   z-index: 1;
+  }
+  tr:last-child td{ border-bottom:none; }
+  .num{ width: 62px; }
+  .pct{ width: 150px; white-space: nowrap; }
+  .games{ width: 110px; white-space: nowrap; }
+  .score{ width: 120px; white-space: nowrap; }
+  .name{ min-width: 200px; }
+  .section{ margin-top: 14px; }
+  details{
+   border: 1px solid var(--line);
+   border-radius: 14px;
+   background: var(--card);
+   overflow: hidden;
+  }
+  details + details{ margin-top: 10px; }
+  summary{
+   cursor: pointer;
+   list-style: none;
+   padding: 14px 14px;
+   font-weight: 800;
+   display:flex;
+   align-items:center;
+   justify-content: space-between;
+   gap: 12px;
+   user-select:none;
+  }
+  summary::-webkit-details-marker{ display:none; }
+  .summary-right{ color: var(--muted); font-weight: 600; font-size: 13px; }
+  .details-body{
+   border-top: 1px solid var(--line);
+   padding: 14px;
+  }
+  .empty{
+   padding: 12px;
+   border: 1px dashed var(--line);
+   border-radius: 12px;
+   color: var(--muted);
+   background: #0f1520;
+   margin-top: 10px;
+  }
+
+  /* Gate */
+  .auth-gate{
+   position: fixed;
+   inset: 0;
+   background: rgba(0,0,0,.6);
+   display:none;
+   align-items:center;
+   justify-content:center;
+   padding: 16px;
+   z-index: 10;
+   backdrop-filter: blur(6px);
+  }
+  .auth-gate-card{
+   width: min(420px, 100%);
+   background: var(--card);
+   border: 1px solid var(--line);
+   border-radius: 16px;
+   padding: 16px;
+   box-shadow: 0 20px 60px rgba(0,0,0,.55);
+  }
+  .auth-gate-title{
+   font-weight: 900;
+   font-size: 18px;
+   margin-bottom: 6px;
+  }
+  .auth-gate-sub{
+   color: var(--muted);
+   font-size: 13px;
+   margin-bottom: 14px;
+   line-height: 1.35;
+  }
+ </style>
+</head>
+<body>
+
+<div class="app">
+<h1>Рейтинг</h1>
+
+
+<div class="section">
+<details id="dayDetails" open="">
+<summary>
+<span>Рейтинг за день</span>
+<span class="summary-right" id="dayMeta">—</span>
+</summary>
+<div class="details-body">
+<div class="row">
+<span class="label">День</span>
+<input id="dayPick" type="date"/>
+<span class="pill" id="dayPill">—</span>
+</div>
+<div id="dayOut">
+<div class="muted">Завантаження…</div>
+</div>
+</div>
+</details>
+<details id="monthDetails">
+<summary>
+<span>Рейтинг за місяць</span>
+<span class="summary-right" id="monthMeta">—</span>
+</summary>
+<div class="details-body">
+<div class="row">
+<span class="label">Місяць</span>
+<input id="monthPick" type="month"/>
+<span class="pill" id="monthPill">—</span>
+</div>
+<div id="monthOut">
+<div class="muted">Завантаження…</div>
+</div>
+</div>
+</details>
+<details id="yearDetails">
+<summary>
+<span>Рейтинг за рік</span>
+<span class="summary-right" id="yearMeta">—</span>
+</summary>
+<div class="details-body">
+<div class="row">
+<span class="label">Рік</span>
+<select id="yearPick"></select>
+<span class="pill" id="yearPill">—</span>
+</div>
+<div id="yearOut">
+<div class="muted">Завантаження…</div>
+</div>
+</div>
+</details>
+</div>
+</div>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+
+  const firebaseConfig = {
+   apiKey: "AIzaSyA21AZnchKpt5TvwFSvBKXrCeYzAi4nzUM",
+   authDomain: "mafiakato.firebaseapp.com",
+   databaseURL: "https://mafiakato-default-rtdb.europe-west1.firebasedatabase.app",
+   projectId: "mafiakato",
+   storageBucket: "mafiakato.firebasestorage.app",
+   messagingSenderId: "739353653752",
+   appId: "1:739353653752:web:fb7497e2135736c43b260d"
+  };
+
+  const app = initializeApp(firebaseConfig);
+
+const db = getDatabase(app);
+
+  // ---------- Firebase key decode (совместимо с pc.html) ----------
+  const FB_FORBIDDEN_RE = /[.$#[\]\/]/g;
+  const FB_KEY_MAP = {
+    ".": "_dot_",
+    "$": "_dol_",
+    "#": "_hash_",
+    "[": "_lb_",
+    "]": "_rb_",
+    "/": "_sl_"
+  };
+  function decodeKeyFromFirebase(key) {
+    return String(key)
+      .replace(/_dot_/g, ".")
+      .replace(/_dol_/g, "$")
+      .replace(/_hash_/g, "#")
+      .replace(/_lb_/g, "[")
+      .replace(/_rb_/g, "]")
+      .replace(/_sl_/g, "/");
+  }
+  function decodeFromFirebase(value) {
+    if (!value || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map(decodeFromFirebase);
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[decodeKeyFromFirebase(k)] = decodeFromFirebase(v);
+    }
+    return out;
+  }
+
+  // Данные для рейтинга: берём то же состояние, что и вкладка "Рейтинг" в pc.html
+  const STATE_DB_PATH = "words/state";
+  const stateRootRef = ref(db, STATE_DB_PATH);
+  // ---------- DOM ----------
+const dayPick = document.getElementById("dayPick");
+  const monthPick = document.getElementById("monthPick");
+  const yearPick = document.getElementById("yearPick");
+
+  const dayOut = document.getElementById("dayOut");
+  const monthOut = document.getElementById("monthOut");
+  const yearOut = document.getElementById("yearOut");
+
+  const dayPill = document.getElementById("dayPill");
+  const monthPill = document.getElementById("monthPill");
+  const yearPill = document.getElementById("yearPill");
+
+  const dayMeta = document.getElementById("dayMeta");
+  const monthMeta = document.getElementById("monthMeta");
+  const yearMeta = document.getElementById("yearMeta");
+    // ---------- Data subscription ----------
+    let stopStateListener = null;
+    function startStateListener(){
+      if (stopStateListener) return;
+      stopStateListener = onValue(
+        stateRootRef,
+        (snap)=>{ onStateSnapshot(snap); },
+        (err)=>{ console.error("stateRootRef onValue error:", err); }
+      );
+    }
+    startStateListener();
+
+    // ---------- State ----------
+
+  let allGamesByDate = {};
+  let availableYears = [];
+
+  // ---------- Helpers ----------
+  function esc(s){
+   return String(s ?? "")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  }
+
+  function isFiniteNumber(x){
+   return typeof x === "number" && Number.isFinite(x);
+  }
+
+  // Один знак после запятой, но ".0" убираем
+  function formatOneDecimalSmart(n){
+   const num = Number(n);
+   if (!Number.isFinite(num)) return "0";
+   const rounded = Math.round(num * 10) / 10;
+   const isInt = Math.abs(rounded - Math.round(rounded)) < 1e-9;
+   return isInt ? String(Math.round(rounded)) : rounded.toFixed(1);
+  }
+
+  function formatPct(p){
+   if (p == null) return "—";
+   const num = Number(p);
+   if (!Number.isFinite(num)) return "—";
+   return formatOneDecimalSmart(num) + "%";
+  }
+
+  function flattenGames(byDate){
+   const out = [];
+   for (const [date, games] of Object.entries(byDate || {})) {
+    for (const [id, g] of Object.entries(games || {})) {
+     out.push({ id, date, game: g });
+    }
+   }
+   out.sort((a,b) => (b.game?.savedAt||0) - (a.game?.savedAt||0));
+   return out;
+  }
+
+  function pickDefaultValues(){
+   const now = new Date();
+   const yyyy = String(now.getFullYear());
+   const mm = String(now.getMonth()+1).padStart(2,"0");
+   const dd = String(now.getDate()).padStart(2,"0");
+
+   if (dayPick && !dayPick.value) dayPick.value = `${yyyy}-${mm}-${dd}`;
+   if (monthPick && !monthPick.value) monthPick.value = `${yyyy}-${mm}`;
+
+   // yearPick заполним позже по доступным годам
+  }
+
+  function buildYearOptions(years){
+   if (!yearPick) return;
+   const current = String(new Date().getFullYear());
+   const unique = Array.from(new Set(years.map(String))).sort((a,b)=> Number(b) - Number(a));
+   // Если данных нет — подставим диапазон
+   const fallback = [];
+   const curY = Number(current);
+   for (let y = curY; y >= curY-10; y--) fallback.push(String(y));
+   const finalYears = unique.length ? unique : fallback;
+
+   yearPick.innerHTML = finalYears.map(y => `<option value="${esc(y)}">${esc(y)}</option>`).join("");
+   if (!yearPick.value) yearPick.value = finalYears.includes(current) ? current : finalYears[0];
+  }
+
+  function collectAvailableYearsFromRoot(root){
+   const years = [];
+   for (const d of Object.keys(root || {})){
+    const y = String(d).slice(0,4);
+    if (/^\d{4}$/.test(y)) years.push(y);
+   }
+   return years;
+  }
+
+  function gamesForDay(dateStr){
+   const day = allGamesByDate?.[dateStr] || {};
+   return flattenGames({ [dateStr]: day }).map(x=>x.game);
+  }
+
+  function gamesForMonth(monthStr){
+   // monthStr = YYYY-MM
+   const sub = {};
+   for (const [d, games] of Object.entries(allGamesByDate || {})){
+    if (String(d).startsWith(monthStr)) sub[d] = games;
+   }
+   return flattenGames(sub).map(x=>x.game);
+  }
+
+  function gamesForYear(yearStr){
+   const sub = {};
+   for (const [d, games] of Object.entries(allGamesByDate || {})){
+    if (String(d).startsWith(yearStr + "-")) sub[d] = games;
+   }
+   return flattenGames(sub).map(x=>x.game);
+  }
+
+  function computeRating(games){
+   const map = new Map();
+
+   for (const g of (games || [])){
+    const players = Array.isArray(g?.players) ? g.players : [];
+    const scores = g?.scores || {};
+    const winnerTeam = g?.winnerTeam || null;
+
+    for (const p of players){
+     const pid = p?.playerId || "";
+     const name = (p?.name || "").trim();
+     const key = pid || (name ? `name:${name}` : `seat:${p?.seat ?? ""}`);
+
+     if (!map.has(key)){
+      map.set(key, {
+       key,
+       playerId: pid || null,
+       name: name || (pid ? pid : "—"),
+       totalGames: 0,
+       wins: 0,
+       redGames: 0,
+       redWins: 0,
+       blackGames: 0,
+       blackWins: 0,
+       totalScore: 0
+      });
+     }
+     const row = map.get(key);
+
+     // обновим имя, если появилось более адекватное
+     if ((row.name === "—" || row.name?.startsWith("name:")) && name) row.name = name;
+
+     row.totalGames += 1;
+
+     // очки
+     let sc = 0;
+     if (pid && scores[pid] != null) sc = Number(scores[pid]) || 0;
+     row.totalScore += sc;
+
+     // победы
+     const team = p?.team || null;
+     const isWin = (winnerTeam && team && winnerTeam === team);
+     if (isWin) row.wins += 1;
+
+     if (team === "red"){
+      row.redGames += 1;
+      if (winnerTeam === "red") row.redWins += 1;
+     } else if (team === "black"){
+      row.blackGames += 1;
+      if (winnerTeam === "black") row.blackWins += 1;
+     }
+    }
+   }
+
+   const rows = Array.from(map.values()).filter(r => r.totalGames > 0);
+
+   // сортировка: очки (desc), победы (desc), игр (desc), имя (asc)
+   rows.sort((a,b)=>{
+    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    if (b.totalGames !== a.totalGames) return b.totalGames - a.totalGames;
+    return String(a.name).localeCompare(String(b.name), "ru");
+   });
+
+   return rows;
+  }
+
+  function renderTable(container, games, rows){
+   const totalGames = games?.length || 0;
+   const totalPlayers = rows?.length || 0;
+
+   const metaHtml = `
+    <div class="row" style="margin-bottom: 6px;">
+     <span class="pill">Ігор: <b style="color:var(--text)">${esc(totalGames)}</b></span>
+     <span class="pill">Гравців: <b style="color:var(--text)">${esc(totalPlayers)}</b></span>
+    </div>
+   `;
+
+   if (!rows.length){
+    container.innerHTML = metaHtml + `<div class="empty">Немає ігор у вибраному періоді.</div>`;
+    return;
+   }
+
+   const body = rows.map((r, i)=>{
+    const winPct = r.totalGames ? (r.wins / r.totalGames * 100) : null;
+    const redPct = r.redGames ? (r.redWins / r.redGames * 100) : null;
+    const blackPct = r.blackGames ? (r.blackWins / r.blackGames * 100) : null;
+
+    return `<tr>
+     <td class="num">${esc(i+1)}</td>
+     <td class="name">${esc(r.name)}</td>
+     <td class="score">${esc(formatOneDecimalSmart(r.totalScore))}</td>
+     <td class="games">${esc(r.totalGames)}</td>
+     <td class="pct">${esc(formatPct(winPct))}</td>
+     <td class="pct">${esc(formatPct(redPct))}</td>
+     <td class="pct">${esc(formatPct(blackPct))}</td>
+    </tr>`;
+   }).join("");
+
+   container.innerHTML = metaHtml + `
+    <div style="overflow:auto; border-radius: 12px;">
+     <table>
+      <thead>
+       <tr>
+        <th class="num">№</th>
+        <th class="name">Ім'я</th>
+        <th class="score">Бали</th>
+        <th class="games">Ігор всього</th>
+        <th class="pct">% перемог</th>
+        <th class="pct">% перемог за червоних</th>
+        <th class="pct">% перемог за чорних</th>
+       </tr>
+      </thead>
+      <tbody>${body}</tbody>
+     </table>
+    </div>
+   `;
+  }
+
+  function setMeta(metaEl, games, rows){
+   if (!metaEl) return;
+   const g = games?.length || 0;
+   const p = rows?.length || 0;
+   metaEl.textContent = `Ігор: ${g} · Гравців: ${p}`;
+  }
+
+  function updateDay(){
+   const dateStr = dayPick?.value || "";
+   dayPill.textContent = dateStr ? `День: ${dateStr}` : "—";
+   const games = dateStr ? gamesForDay(dateStr) : [];
+   const rows = computeRating(games);
+   renderTable(dayOut, games, rows);
+   setMeta(dayMeta, games, rows);
+  }
+
+  function updateMonth(){
+   const monthStr = monthPick?.value || "";
+   monthPill.textContent = monthStr ? `Місяць: ${monthStr}` : "—";
+   const games = monthStr ? gamesForMonth(monthStr) : [];
+   const rows = computeRating(games);
+   renderTable(monthOut, games, rows);
+   setMeta(monthMeta, games, rows);
+  }
+
+  function updateYear(){
+   const yearStr = yearPick?.value || "";
+   yearPill.textContent = yearStr ? `Рік: ${yearStr}` : "—";
+   const games = yearStr ? gamesForYear(yearStr) : [];
+   const rows = computeRating(games);
+   renderTable(yearOut, games, rows);
+   setMeta(yearMeta, games, rows);
+  }
+
+  dayPick?.addEventListener("change", updateDay);
+  dayPick?.addEventListener("input", updateDay);
+  monthPick?.addEventListener("change", updateMonth);
+  monthPick?.addEventListener("input", updateMonth);
+  yearPick?.addEventListener("change", updateYear);
+
+  // ---------- Data snapshot ----------
+  function onStateSnapshot(snap){
+   const raw = snap.val() || {};
+   const state = decodeFromFirebase(raw) || {};
+
+   const playersList = Array.isArray(state?.players) ? state.players : [];
+   const playersById = new Map(playersList.map(p => [String(p?.id || ""), p]));
+
+   const history = Array.isArray(state?.history) ? state.history : [];
+
+   // Приводим историю к формату, который ожидает текущий рендер рейтинга (по датам)
+   const byDate = {};
+   for (const g of history){
+    const dateStr = String(g?.date || "");
+    if (!dateStr) continue;
+
+    const gid = String(g?.timestamp || g?.savedAt || g?.num || g?.number || Math.random());
+    if (!byDate[dateStr]) byDate[dateStr] = {};
+
+    const scores = {};
+    const players = Array.isArray(g?.players) ? g.players.map(pr => {
+      const pid = String(pr?.playerId || "");
+      const name = (playersById.get(pid)?.name || pr?.name || "").trim();
+      const team = pr?.team || null;
+      const seat = pr?.seat ?? null;
+
+      const sc = Number(pr?.score || 0) || 0;
+      if (pid) scores[pid] = sc;
+
+      return { playerId: pid, name, team, seat };
+    }) : [];
+
+    byDate[dateStr][gid] = {
+      players,
+      scores,
+      winnerTeam: g?.winnerTeam || null,
+      savedAt: Number(g?.timestamp || g?.savedAt || 0) || 0
+    };
+   }
+
+   allGamesByDate = byDate;
+   availableYears = collectAvailableYearsFromRoot(allGamesByDate);
+
+   pickDefaultValues();
+   buildYearOptions(availableYears);
+
+   // первичная отрисовка
+   updateDay();
+   updateMonth();
+   updateYear();
+  }
+
+  // Заглушка на случай, если пользователь открыл секции до загрузки
+  pickDefaultValues();
+ </script>
+</body>
+</html>

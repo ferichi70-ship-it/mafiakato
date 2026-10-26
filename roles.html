@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Роли игроков</title>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --card: #12131a;
+      --muted: rgba(255,255,255,0.65);
+      --text: rgba(255,255,255,0.92);
+      --line: rgba(255,255,255,0.10);
+      --btn: rgba(255,255,255,0.12);
+      --btn2: rgba(255,255,255,0.18);
+      --danger: #ff4d4d;
+      --ok: #4dff88;
+    }
+    html, body {
+      height: 100%;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+      touch-action: manipulation;
+    }
+    body.theme-red { background: #d92323; color: #000; }
+    body.theme-black { background: #000; color: #fff; }
+
+    /* Make overlay background match the team to avoid seeing UI behind oversized text */
+    .overlay.theme-red {
+      background: #d92323;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    .overlay.theme-black {
+      background: #000;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    /* On phones, make the sheet a full-screen layout */
+    @media (max-width: 520px) {
+      .sheetMain {
+        padding-top: calc(18px + env(safe-area-inset-top));
+        padding-bottom: calc(18px + env(safe-area-inset-bottom));
+      }
+
+      .overlay { padding: 0; }
+      .sheet {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .sheetHeader { padding-top: max(18px, env(safe-area-inset-top)); }
+      .nav { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: calc(16px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
+    }
+    header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .status {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .status .dot {
+      display:inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      transform: translateY(1px);
+      background: rgba(255,255,255,0.3);
+    }
+    .status[data-state="ok"] .dot { background: var(--ok); }
+    .status[data-state="err"] .dot { background: var(--danger); }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin: 10px 0 12px;
+    }
+    button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--btn);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-weight: 650;
+      font-size: 15px;
+      letter-spacing: 0.2px;
+      flex: 1;
+    }
+    button:active { background: var(--btn2); }
+    button[disabled] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .listHeader {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .rows { display: block; }
+    .row {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 10px;
+      padding: 14px 12px;
+      border-bottom: 1px solid var(--line);
+      align-items: center;
+      min-height: 56px;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .row:last-child { border-bottom: none; }
+    .row:active { background: rgba(255,255,255,0.04); }
+
+    .seat {
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .role {
+      font-size: 16px;
+      font-weight: 700;
+      text-align: right;
+    }
+    .hint {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    /* Fullscreen overlay */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 9999;
+    }
+    .overlay.show { display: flex; }
+
+    .sheet {
+      width: min(720px, 100%);
+      height: min(820px, 100%);
+      background: #0f1016;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 14px 14px 12px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .closeBtn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.10);
+      font-size: 22px;
+      line-height: 0;
+      padding: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    .sheetMain {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 18px 8px;
+      text-align: center;
+    }
+    .sheetSeat {
+      font-size: clamp(72px, 14.4vw, 220px);
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      line-height: 1.02;
+      white-space: nowrap;
+      word-break: normal;
+      overflow: visible;
+      color: inherit;
+      margin-bottom: 12px;
+    }
+    .sheetRole {
+      font-size: clamp(72px, 14.4vw, 220px);
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      line-height: 1.02;
+      /* No wrapping: if it doesn't fit, JS will shrink the font size */
+      white-space: nowrap;
+      word-break: normal;
+      overflow: visible;
+    }
+
+    /* --- Team theming in overlay --- */
+    .sheet.team-red {
+      background: #d92323;
+      color: #000;
+    }
+    .sheet.team-red .sheetSeat { color: inherit; }
+    .sheet.team-red .footerNote { color: rgba(0,0,0,0.70); }
+    .sheet.team-red button {
+      color: #000;
+      border-color: rgba(0,0,0,0.22);
+      background: rgba(0,0,0,0.10);
+    }
+    .sheet.team-red button.primary { background: rgba(0,0,0,0.16); }
+
+    .nav {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    /* Bigger nav buttons (Назад/Далее) */
+    .nav button {
+      padding: 24px 16px;
+      font-size: 18px;
+      border-radius: 18px;
+    }
+    .ghost { background: transparent; }
+
+    .footerNote {
+      text-align: center;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+  
+    /* --- Gate (game code) --- */
+    .gate {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px 14px;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+    .gate.show { display: flex; }
+    .gateCard {
+      width: min(520px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px 16px 16px;
+      box-shadow: 0 18px 50px rgba(0,0,0,0.55);
+    }
+    .gateTitle {
+      font-size: 18px;
+      font-weight: 850;
+      letter-spacing: 0.2px;
+      margin-bottom: 10px;
+    }
+    .gateHint {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 10px;
+      line-height: 1.35;
+    }
+    .gateRow { display: flex; gap: 10px; align-items: center; }
+    .gateInput {
+      flex: 1;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: 18px;
+      font-weight: 750;
+      letter-spacing: 2px;
+      text-align: center;
+      outline: none;
+    }
+    .gateErr {
+      margin-top: 10px;
+      color: var(--danger);
+      font-size: 13px;
+      min-height: 18px;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div id="gate" class="gate show" aria-modal="true" role="dialog">
+    <div class="gateCard">
+      <div class="gateTitle">Введите код игры</div>
+      <div class="gateHint">Код отображается у ведущего в основной странице игры (4 цифры).</div>
+      <div class="gateRow">
+        <input id="gateInput" class="gateInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" />
+        <button id="gateBtn" type="button">Войти</button>
+      </div>
+      <div id="gateErr" class="gateErr"></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <header>
+      <h1>Роли игроков</h1>
+      <div id="status" class="status" data-state="idle"><span class="dot"></span><span id="statusText">Подключение…</span></div>
+    </header>
+
+    <div class="controls">
+      <button id="startBtn" disabled>Старт</button>
+    </div>
+
+    <div class="card">
+      <div class="listHeader">
+        <div>Игрок</div>
+        <div>Роль</div>
+      </div>
+      <div id="rows" class="rows"></div>
+    </div>
+
+    <div class="hint">
+      Нажмите <b>Старт</b>, чтобы по очереди показать роли на весь экран. Или нажмите на игрока в списке, чтобы открыть его роль.
+      <br>Источник данных: Firebase → <code>words/state</code>.
+    </div>
+  </div>
+
+  <!-- Overlay / Wizard -->
+  <div id="overlay" class="overlay" role="dialog" aria-modal="true">
+    <div class="sheet">
+      <button id="closeBtn" class="closeBtn" aria-label="Закрыть">×</button>
+
+      <div class="sheetMain">
+        <div id="sheetSeat" class="sheetSeat"></div>
+        <div id="sheetRole" class="sheetRole"></div>
+      </div>
+
+      <div id="nav" class="nav">
+        <button id="backBtn" class="ghost">Назад</button>
+        <button id="nextBtn">Далее</button>
+      </div>
+
+      <div id="footerNote" class="footerNote"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-app.js";
+    import { getDatabase, ref, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-database.js";
+
+    const firebaseConfig = {
+     apiKey: "AIzaSyA21AZnchKpt5TvwFSvBKXrCeYzAi4nzUM",
+      authDomain: "mafiakato.firebaseapp.com",
+      databaseURL: "https://mafiakato-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "mafiakato",
+      storageBucket: "mafiakato.firebasestorage.app",
+      messagingSenderId: "739353653752",
+      appId: "1:739353653752:web:fb7497e2135736c43b260d"
+    };
+
+    const STATE_PATH = "words/state";
+
+    const elStatus = document.getElementById("status");
+    const elStatusText = document.getElementById("statusText");
+    const elRows = document.getElementById("rows");
+    const elStart = document.getElementById("startBtn");
+
+    const gate = document.getElementById("gate");
+    const gateInput = document.getElementById("gateInput");
+    const gateBtn = document.getElementById("gateBtn");
+    const gateErr = document.getElementById("gateErr");
+
+    let unlocked = false;
+    let acceptedCode = null;
+    const overlay = document.getElementById("overlay");
+    const closeBtn = document.getElementById("closeBtn");
+    const backBtn = document.getElementById("backBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const nav = document.getElementById("nav");
+    const sheetSeat = document.getElementById("sheetSeat");
+    const sheetRole = document.getElementById("sheetRole");
+    const footerNote = document.getElementById("footerNote");
+
+    const sheet = overlay ? overlay.querySelector(".sheet") : null;
+
+    // Roles classification for overlay theming
+    // Санта играет за красных → относится к красной команде (как мирные)
+    const RED_ROLES = new Set(["мирный","комиссар","врач","журналист","маньяк","камикадзе","санта"]);
+    const BLACK_ROLES = new Set(["дон","путана","мафия","шантажист"]);
+
+    function roleTeam(roleName) {
+      const r = String(roleName || "").trim().toLowerCase();
+      if (RED_ROLES.has(r)) return "red";
+      if (BLACK_ROLES.has(r)) return "black";
+      return "black";
+    }
+
+    function applyTeamTheme(roleName) {
+      const team = roleTeam(roleName) === "red" ? "red" : "black";
+
+      // Sheet styling
+      if (sheet) {
+        sheet.classList.remove("team-red");
+        if (team === "red") sheet.classList.add("team-red");
+      }
+
+      // Full-page / overlay styling
+      overlay.classList.toggle("theme-red", team === "red");
+      overlay.classList.toggle("theme-black", team !== "red");
+      document.body.classList.toggle("theme-red", team === "red");
+      document.body.classList.toggle("theme-black", team !== "red");
+    }
+    // Shrink role font size until it fits on one line (no wrapping).
+    function fitRoleText() {
+      if (!sheetRole) return;
+      if (!overlay.classList.contains("show")) return;
+
+      // Reset to CSS-driven size first
+      sheetRole.style.fontSize = "";
+
+      // If the role still doesn't fit, progressively shrink.
+      const minPx = 26; // keep readable on iPhone
+      let fontPx = parseFloat(getComputedStyle(sheetRole).fontSize) || 72;
+
+      // Guard: if the element isn't measurable yet.
+      if (!sheetRole.clientWidth) return;
+
+      let i = 0;
+      while (sheetRole.scrollWidth > sheetRole.clientWidth && fontPx > minPx && i < 60) {
+        fontPx = fontPx * 0.94; // ~6% smaller per step
+        sheetRole.style.fontSize = fontPx.toFixed(2) + "px";
+        i++;
+      }
+    }
+
+
+    let players = []; // [{seat:number, role:string}]
+    let wizardIndex = 0;
+    let overlayMode = "single"; // "single" | "wizard"
+
+    function setStatus(state, text) {
+      elStatus.dataset.state = state;
+      elStatusText.textContent = text;
+    }
+
+    function normalizePlayers(remote) {
+      // ожидаем: remote.currentGame.players = [{seat, role, ...}]
+      const cg = remote && remote.currentGame;
+      const arr = (cg && Array.isArray(cg.players)) ? cg.players : [];
+      const out = arr
+        .map(p => {
+          const seat = Number(p && p.seat);
+          const role = (p && (p.role || p.roleName || p.r || "")) + "";
+          return {
+            seat: Number.isFinite(seat) ? seat : null,
+            role: role.trim()
+          };
+        })
+        .filter(p => p.seat !== null && p.seat > 0);
+
+      out.sort((a,b) => a.seat - b.seat);
+      return out;
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function renderList() {
+      elRows.innerHTML = "";
+      if (!players.length) {
+        const empty = document.createElement("div");
+        empty.className = "row";
+        empty.innerHTML = '<div class="seat">—</div><div class="role" style="text-align:right; font-weight:650; color: rgba(255,255,255,0.55)">Нет данных</div>';
+        elRows.appendChild(empty);
+        elStart.disabled = true;
+        return;
+      }
+
+      elStart.disabled = false;
+
+      for (const p of players) {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.dataset.seat = String(p.seat);
+        row.innerHTML = `
+          <div class="seat">№ ${p.seat}</div>
+          <div class="role">${escapeHtml(p.role || "—")}</div>
+        `;
+        row.addEventListener("click", () => openSingle(p.seat));
+        elRows.appendChild(row);
+      }
+    }
+
+    function showOverlay() {
+      overlay.classList.add("show");
+      document.body.style.overflow = "hidden";
+      requestAnimationFrame(() => fitRoleText());
+    }
+
+    function hideOverlay() {
+      overlay.classList.remove("show");
+      document.body.style.overflow = "";
+      overlay.classList.remove("theme-red", "theme-black");
+      document.body.classList.remove("theme-red", "theme-black");
+    }
+
+    function setSheet(p, noteText = "") {
+      sheetSeat.textContent = String(p.seat);
+      sheetRole.textContent = p.role || "—";
+      applyTeamTheme(p.role);
+      footerNote.textContent = noteText;
+      // Fit after DOM updates
+      requestAnimationFrame(() => fitRoleText());
+    }
+
+    function openSingle(seat) {
+      const p = players.find(x => x.seat === seat);
+      if (!p) return;
+
+      overlayMode = "single";
+      nav.style.display = "none";
+      setSheet(p, "");
+      showOverlay();
+    }
+
+    function openWizard() {
+      if (!players.length) return;
+
+      overlayMode = "wizard";
+      wizardIndex = 0;
+      nav.style.display = "grid";
+      renderWizardStep();
+      showOverlay();
+    }
+
+    function renderWizardStep() {
+      const p = players[wizardIndex];
+      if (!p) return;
+
+      setSheet(p, `${wizardIndex + 1} из ${players.length}`);
+
+      backBtn.disabled = (wizardIndex === 0);
+
+      const isLast = wizardIndex === players.length - 1;
+      nextBtn.textContent = isLast ? "Готово" : "Далее";
+    }
+
+    // Events
+    elStart.addEventListener("click", openWizard);
+    closeBtn.addEventListener("click", hideOverlay);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) hideOverlay();
+    });
+
+    backBtn.addEventListener("click", () => {
+      if (overlayMode !== "wizard") return;
+      if (wizardIndex <= 0) return;
+      wizardIndex -= 1;
+      renderWizardStep();
+    });
+
+    nextBtn.addEventListener("click", () => {
+      if (overlayMode !== "wizard") return;
+      const isLast = wizardIndex === players.length - 1;
+      if (isLast) {
+        hideOverlay();
+        return;
+      }
+      wizardIndex += 1;
+      renderWizardStep();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (!overlay.classList.contains("show")) return;
+
+      if (e.key === "Escape") {
+        hideOverlay();
+        return;
+      }
+      if (overlayMode === "wizard") {
+        if (e.key === "ArrowLeft") backBtn.click();
+        if (e.key === "ArrowRight") nextBtn.click();
+      }
+    });
+
+    // Firebase subscribe (no auth)
+    try {
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+      const stateRef = ref(db, STATE_PATH);
+
+      // до ввода кода ничего не показываем
+      setStatus("idle", "Введите код игры");
+      elStart.disabled = true;
+
+      function setGateError(msg) {
+        gateErr.textContent = msg || "";
+      }
+
+      function sanitizeGateInput() {
+        gateInput.value = String(gateInput.value || "").replace(/\D/g, "").slice(0, 4);
+      }
+
+      async function unlockByCode() {
+        sanitizeGateInput();
+        const code = (gateInput.value || "").trim();
+
+        if (!/^\d{4}$/.test(code)) {
+          setGateError("Введите 4 цифры.");
+          return;
+        }
+
+        setGateError("");
+        setStatus("idle", "Проверка кода…");
+
+        try {
+          const snap = await get(stateRef);
+          if (!snap.exists()) {
+            setGateError("В базе нет состояния игры.");
+            setStatus("err", "Нет state в базе");
+            return;
+          }
+
+          const remote = snap.val() || {};
+          const gameCode = remote && remote.currentGame ? remote.currentGame.gameCode : null;
+
+          if (!gameCode) {
+            setGateError("Код игры ещё не создан. Откройте основную страницу и создайте игру.");
+            setStatus("idle", "Ожидание кода");
+            return;
+          }
+
+          if (String(gameCode) !== String(code)) {
+            setGateError("Неверный код.");
+            setStatus("idle", "Неверный код");
+            return;
+          }
+
+          unlocked = true;
+          acceptedCode = String(code);
+          gate.classList.remove("show");
+          setStatus("idle", "Подключение…");
+
+          // подписка на изменения игры
+          onValue(stateRef, (snap) => {
+            const remote = snap.val();
+            const remoteCode = remote && remote.currentGame ? remote.currentGame.gameCode : null;
+
+            // Если ранее уже ввели код, но ведущий начал новую игру / сделал сброс
+            // (код поменялся или данные отсутствуют) — снова требуем ввод.
+            if (unlocked) {
+              if (!remote || !remoteCode || !acceptedCode || String(remoteCode) !== String(acceptedCode)) {
+                unlocked = false;
+                acceptedCode = null;
+                players = [];
+                renderList();
+                hideOverlay();
+                gate.classList.add("show");
+                gateInput.value = "";
+                setGateError("Код игры изменился. Введите новый код.");
+                setStatus("idle", "Введите новый код игры");
+                return;
+              }
+            } else {
+              // пока не разблокировали — не показываем ничего
+              return;
+            }
+
+            players = normalizePlayers(remote);
+            renderList();
+            setStatus("ok", "Онлайн");
+          }, (err) => {
+            console.error(err);
+            players = [];
+            renderList();
+            setStatus("err", "Ошибка доступа к базе");
+          });
+        } catch (err) {
+          console.error(err);
+          setGateError("Ошибка проверки кода.");
+          setStatus("err", "Ошибка доступа к базе");
+        }
+      }
+
+      if (gateInput) {
+        gateInput.addEventListener("input", sanitizeGateInput);
+        gateInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") unlockByCode();
+        });
+        // iOS friendly focus
+        setTimeout(() => {
+          try { gateInput.focus(); } catch (_) {}
+        }, 50);
+      }
+      if (gateBtn) gateBtn.addEventListener("click", unlockByCode);
+
+    } catch (e) {
+      console.error(e);
+      setStatus("err", "Ошибка инициализации");
+    }
+  
+    // iOS: aggressively prevent zoom (double-tap / pinch)
+    (function preventIOSZoom() {
+      // Disable pinch-zoom gesture events (Safari)
+      ["gesturestart", "gesturechange", "gestureend"].forEach((evt) => {
+        document.addEventListener(evt, (e) => e.preventDefault(), { passive: false });
+      });
+
+      // Disable double-tap zoom
+      let lastTouchEnd = 0;
+      document.addEventListener("touchend", (e) => {
+        const now = Date.now();
+        if (now - lastTouchEnd <= 300) {
+          e.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, { passive: false });
+
+      // Desktop / some browsers
+      document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+    })();
+
+</script>
+</body>
+</html>

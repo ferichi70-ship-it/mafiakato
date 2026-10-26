@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Історія ігор — Мафія (моб)</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root { color-scheme: dark light; }
+    * { box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:#050608;
+      color:#f9fafb;
+    }
+    .app{ max-width:980px; margin:0 auto; padding:16px 14px 40px; }
+    h1{ font-size:18px; margin:8px 0 12px; }
+    .card{
+      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(255,255,255,0.03);
+      border-radius:16px;
+      padding:12px 12px;
+      margin-bottom:12px;
+    }
+    .row{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+    label{ font-size:12px; color:#cbd5e1; display:block; margin-bottom:6px; }
+    input[type="date"]{
+      height:44px; padding:0 12px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(255,255,255,0.05);
+      color:#f9fafb;
+      font-size:14px;
+    }
+    button{
+      height:44px; padding:0 12px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.10);
+      background:rgba(255,255,255,0.06);
+      color:#f9fafb;
+      font-weight:700;
+    }
+    .primary{ background:rgba(59,130,246,0.18); border-color:rgba(59,130,246,0.35); }
+    .muted{ color:#9ca3af; font-size:12px; }
+    .game{
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:14px;
+      overflow:hidden;
+      margin-top:10px;
+    }
+    .game-head{
+      display:flex; justify-content:space-between; align-items:center;
+      gap:10px; padding:10px 12px;
+      background:rgba(255,255,255,0.04);
+      cursor:pointer;
+    }
+    .game-title{ font-weight:800; font-size:14px; }
+    .game-sub{ font-size:12px; color:#9ca3af; }
+    .game-body{ display:none; padding:12px; }
+    .game.open .game-body{ display:block; }
+    table{ width:100%; border-collapse:collapse; }
+    th,td{ text-align:left; padding:8px 6px; border-bottom:1px solid rgba(255,255,255,0.08); font-size:13px; }
+    th{ color:#cbd5e1; font-weight:700; }
+    pre{
+      white-space:pre-wrap;
+      background:rgba(0,0,0,0.35);
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.08);
+      font-size:12px;
+      color:#e5e7eb;
+    }
+    a{ color:#93c5fd; }
+  
+    .authbar{ display:flex; gap:10px; align-items:center; justify-content:flex-end; margin:8px 0 0; flex-wrap:wrap; }
+    .auth-gate{
+      position:fixed; inset:0; background:rgba(0,0,0,0.78);
+      z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px;
+    }
+    .auth-gate-card{
+      width:min(420px, 100%); background:rgba(15,23,42,0.96);
+      border:1px solid rgba(148,163,184,0.35); border-radius:16px;
+      padding:16px; text-align:center;
+    }
+    .auth-gate-title{ font-size:18px; font-weight:800; margin-bottom:6px; }
+    .auth-gate-sub{ font-size:13px; color:#cbd5e1; margin-bottom:14px; line-height:1.35; }
+
+
+    .danger-btn{background:#2a1111;border:1px solid rgba(255,255,255,.14);color:#ffdede;padding:8px 10px;border-radius:10px;cursor:pointer;}
+    .danger-btn:hover{filter:brightness(1.12);}
+
+    .history-toggle{
+      width:100%;
+      text-align:left;
+      height:auto;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.08);
+      background:rgba(255,255,255,0.03);
+      color:#cbd5e1;
+      font-weight:800;
+      font-size:12px;
+      cursor:pointer;
+    }
+    .history-toggle:hover{ filter:brightness(1.08); }
+    .history-body{ margin-top:8px; }
+
+</style>
+</head>
+<body>
+  <div id="authGate" class="auth-gate" style="display:none;">
+    <div class="auth-gate-card">
+      <div class="auth-gate-title">Вхід ведучого</div>
+      <div class="auth-gate-sub">Для перегляду історії потрібна авторизація.</div>
+      <button id="btnLoginGate" class="primary" type="button">Увійти</button>
+    </div>
+  </div>
+
+  <div id="appRoot">
+  <div class="app">
+    <h1>Історія ігор</h1>
+    <div class="authbar">
+      <span id="authStatus" class="muted">Гість (лише читання)</span>
+      <button id="btnLogin" type="button">Увійти</button>
+      <button id="btnLogout" type="button" style="display:none;">Вийти</button>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <label for="filterDate">Дата</label>
+          <input id="filterDate" type="date" />
+        </div>
+        <button id="btnAll" class="primary" type="button">Показати всі ігри</button>
+      </div>
+</div>
+
+    <div id="content" class="card">
+      <div class="muted">Завантаження…</div>
+    </div>
+  </div>
+
+  </div><!-- /appRoot -->
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signInWithEmailAndPassword,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+    import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA21AZnchKpt5TvwFSvBKXrCeYzAi4nzUM",
+      authDomain: "mafiakato.firebaseapp.com",
+      databaseURL: "https://mafiakato-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "mafiakato",
+      storageBucket: "mafiakato.firebasestorage.app",
+      messagingSenderId: "739353653752",
+      appId: "1:739353653752:web:fb7497e2135736c43b260d"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+    const MOB_DB_ROOT = "words/mob/v1";
+    const gamesRootRef = ref(db, `${MOB_DB_ROOT}/gamesByDate`);
+    // ---------- Auth ----------
+    const authGateEl = document.getElementById("authGate");
+    const authStatusEl = document.getElementById("authStatus");
+    const btnLoginEl = document.getElementById("btnLogin");
+    const btnLogoutEl = document.getElementById("btnLogout");
+    const btnLoginGateEl = document.getElementById("btnLoginGate");
+
+    let stopGamesListener = null;
+
+    function showGate(){
+      if (authGateEl) authGateEl.style.display = "flex";
+      if (btnLoginEl) btnLoginEl.style.display = "";
+      if (btnLogoutEl) btnLogoutEl.style.display = "none";
+      if (authStatusEl) authStatusEl.textContent = "Гість (лише читання)";
+    }
+    function hideGate(user){
+      if (authGateEl) authGateEl.style.display = "none";
+      if (btnLoginEl) btnLoginEl.style.display = "none";
+      if (btnLogoutEl) btnLogoutEl.style.display = "";
+      const label = user?.email ? user.email : user?.uid;
+      if (authStatusEl) authStatusEl.textContent = "Ведучий: " + (label || "—");
+    }
+
+    async function doLogin(){
+      const email = prompt("Email для входу в Firebase:");
+      if (!email) return;
+      const password = prompt("Пароль:");
+      if (!password) return;
+      await signInWithEmailAndPassword(auth, email, password);
+    }
+
+    function startGamesListener(){
+      if (stopGamesListener) return;
+      stopGamesListener = onValue(
+        gamesRootRef,
+        (snap)=>{ renderFromRootSnapshot(snap); },
+        (err)=>{ console.error("gamesRootRef onValue error:", err); }
+      );
+    }
+    function stopGames(){
+      try { if (stopGamesListener) stopGamesListener(); } catch(_){}
+      stopGamesListener = null;
+    }
+
+    if (btnLoginEl) btnLoginEl.addEventListener("click", ()=>doLogin().catch((e)=>{
+      console.error(e); alert("Не вдалося увійти: " + (e?.code || e?.message || e));
+    }));
+    if (btnLoginGateEl) btnLoginGateEl.addEventListener("click", ()=>{ if (btnLoginEl) btnLoginEl.click(); });
+    if (btnLogoutEl) btnLogoutEl.addEventListener("click", ()=>{ signOut(auth).catch(console.error); });
+
+    onAuthStateChanged(auth, (user)=>{
+      if (user){
+        hideGate(user);
+        startGamesListener();
+      } else {
+        stopGames();
+        showGate();
+      }
+    });
+
+
+    const filterDate = document.getElementById("filterDate");
+    const btnAll = document.getElementById("btnAll");
+    const content = document.getElementById("content");
+
+    let allGamesByDate = {};
+
+    function esc(s){
+      return String(s ?? "")
+        .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+    }
+
+    function formatScore(v){
+      const n = Number(v);
+      if (!Number.isFinite(n)) return "0";
+      const rounded = Math.round(n * 10) / 10;
+      return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    }
+
+    function flattenGames(byDate){
+      const out = [];
+      for (const [date, games] of Object.entries(byDate || {})) {
+        for (const [id, g] of Object.entries(games || {})) {
+          out.push({ id, date, game: g });
+        }
+      }
+      out.sort((a,b) => (b.game?.savedAt||0) - (a.game?.savedAt||0));
+      return out;
+    }
+
+
+    // Перерахунок балів прямо в історії (щоб історія не залежала від того, як/коли вони були записані при збереженні)
+    function computeScoresFromGame(g){
+      try{
+        if (!g) return null;
+        if (!g.rulesPoints) return null;
+        const players = Array.isArray(g.players) ? g.players : [];
+        if (!players.length) return null;
+
+        const P = {};
+        for (const [k,v] of Object.entries(g.rulesPoints || {})) {
+          const n = (typeof v === "string") ? (parseFloat(String(v).replace(",", ".")) || 0) : (Number(v) || 0);
+          P[k] = Number.isFinite(n) ? n : 0;
+        }
+
+        const scores = {};
+        const add = (pid, inc) => {
+          if (!pid) return;
+          const n = (typeof inc === "string") ? parseFloat(String(inc).replace(",", ".")) : Number(inc);
+          if (!Number.isFinite(n) || n === 0) return;
+          scores[pid] = (scores[pid] || 0) + n;
+        };
+
+        const teamForRoleId = (roleId) => {
+          const id = String(roleId || "citizen");
+          if (id === "maniac") return "maniac";
+          const blackSet = new Set(["don", "mafia", "grinch", "putana", "shant"]);
+          return blackSet.has(id) ? "black" : "red";
+        };
+
+        const seatToPid = {};
+        const seatToRole = {};
+        const seatToTeam = {};
+        const seatToAliveEnd = {};
+        for (const p of players) {
+          const seat = String(p.seat ?? "");
+          if (!seat) continue;
+          seatToPid[seat] = p.playerId || null;
+          seatToRole[seat] = p.roleId || "citizen";
+          seatToTeam[seat] = p.team || teamForRoleId(p.roleId);
+          seatToAliveEnd[seat] = (p.aliveEnd == null) ? true : !!p.aliveEnd;
+        }
+
+        const winnerTeam = g.winnerTeam || null;
+
+        // Победа
+        if (winnerTeam === "maniac") {
+          for (const p of players) {
+            if (p.roleId === "maniac" && p.playerId) add(p.playerId, (P.maniacWin || 0));
+          }
+        } else if (winnerTeam === "red" || winnerTeam === "black") {
+          for (const p of players) {
+            const team = p.team || seatToTeam[String(p.seat ?? "")] || teamForRoleId(p.roleId);
+            if (p.playerId && team === winnerTeam) {
+              add(p.playerId, winnerTeam === "red" ? (P.redWin || 0) : (P.blackWin || 0));
+            }
+          }
+        }
+
+        const nightArr = Array.isArray(g.nightLogs) ? g.nightLogs : [];
+        const dayArr = Array.isArray(g.dayLogs) ? g.dayLogs : [];
+
+        // Нічні дії
+        for (const nlog of nightArr) {
+          const alive = Number(nlog.aliveAtStart || 0) || 0;
+
+          if (nlog.donFoundKomissar) {
+            const pid = nlog.donPlayerId || (nlog.donSeat ? seatToPid[String(nlog.donSeat)] : null);
+            add(pid, (P.donFindSheriff || 0) * alive);
+          }
+          if (nlog.putanaBlockedActive) {
+            const pid = nlog.putanaPlayerId || (nlog.putanaSeat ? seatToPid[String(nlog.putanaSeat)] : null);
+            add(pid, (P.hookSuccess || 0) * alive);
+          }
+          if (nlog.komissarFoundBlack) {
+            const pid = nlog.komissarPlayerId || (nlog.komissarSeat ? seatToPid[String(nlog.komissarSeat)] : null);
+            add(pid, (P.sheriffFindBlack || 0) * alive);
+          }
+          if (nlog.journalistDifferent) {
+            const pid = nlog.journalistPlayerId || (nlog.journalistSeat ? seatToPid[String(nlog.journalistSeat)] : null);
+            add(pid, (P.journalistDifferent || 0) * alive);
+          }
+          if (nlog.doctorSavedShot) {
+            const pid = nlog.doctorPlayerId || (nlog.doctorSeat ? seatToPid[String(nlog.doctorSeat)] : null);
+            add(pid, (P.doctorSaveShot || 0) * alive);
+          }
+          if (nlog.shantFoundJournalist) {
+            const pid = nlog.shantPlayerId || (nlog.shantSeat ? seatToPid[String(nlog.shantSeat)] : null);
+            add(pid, (P.blackmailerFindJournalist || 0) * alive);
+          }
+          if (nlog.santaFoundGrinch) {
+            const pid = nlog.santaPlayerId || (nlog.santaSeat ? seatToPid[String(nlog.santaSeat)] : null);
+            const aliveCheck = Number(nlog.santaAliveAtCheck || nlog.aliveAtStart || 0) || 0;
+            add(pid, (P.santaFindGrinch || 0) * aliveCheck);
+          }
+        }
+
+        // День 1: заголосований
+        for (const dlog of dayArr) {
+          if (Number(dlog.day) !== 1) continue;
+          if (dlog.type !== "kill") continue;
+          const seat = String(dlog.eliminatedSeat ?? "");
+          const pid = seatToPid[seat] || null;
+          if (!pid) continue;
+          if (dlog.eliminatedRoleId === "doctor") add(pid, (P.doctorLynchedDay1 || 0));
+          if (dlog.eliminatedRoleId === "komissar") add(pid, (P.sheriffLynchedDay1 || 0));
+          if (dlog.eliminatedRoleId === "journalist") add(pid, (P.journalistLynchedDay1 || 0));
+        }
+
+        // Камикадзе
+        for (const dlog of dayArr) {
+          if (!dlog.kamikazeSeat || !dlog.kamikazeTarget) continue;
+          const pid = seatToPid[String(dlog.kamikazeSeat)] || null;
+          if (!pid) continue;
+          const trgSeat = String(dlog.kamikazeTarget);
+          const trgRole = seatToRole[trgSeat] || "citizen";
+          const trgTeam = teamForRoleId(trgRole);
+          add(pid, trgTeam === "black" ? (P.kamikazeTakeBlack || 0) : (P.kamikazeTakeRed || 0));
+        }
+
+        // Виживші червоні при перемозі червоних
+        if (winnerTeam === "red") {
+          for (const p of players) {
+            const seat = String(p.seat ?? "");
+            const team = p.team || seatToTeam[seat] || teamForRoleId(p.roleId);
+            const aliveEnd = (p.aliveEnd == null) ? seatToAliveEnd[seat] : !!p.aliveEnd;
+            if (team === "red" && aliveEnd && p.playerId) add(p.playerId, (P.redSurviveOnRedWin || 0));
+          }
+        }
+
+        // MVP
+        if (g.mvp && g.mvp.playerId) {
+          add(g.mvp.playerId, Number(g.mvp.bonus || 0));
+        }
+
+        // Кращий хід
+        if (g.bestMoveBonuses && typeof g.bestMoveBonuses === "object") {
+          for (const [pid, inc] of Object.entries(g.bestMoveBonuses)) {
+            add(pid, Number(inc || 0));
+          }
+        }
+
+        // Порівняння зі збереженими (для діагностики)
+        const saved = (g.scores && typeof g.scores === "object") ? g.scores : {};
+        let diff = 0;
+        const allPids = new Set([...Object.keys(scores), ...Object.keys(saved)]);
+        for (const pid of allPids) {
+          const a = Number(scores[pid] || 0);
+          const b = Number(saved[pid] || 0);
+          if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+          if (Math.abs(a - b) > 0.05) diff += 1;
+        }
+        const note = diff > 0
+          ? `Увага: бали перераховано при відображенні (відмінностей із збереженими: ${diff}).`
+          : "";
+
+        return { scores, note };
+      } catch (e) {
+        console.error("computeScoresFromGame error:", e);
+        return null;
+      }
+    }
+
+
+    function render(list){
+      content.innerHTML = "";
+      if (!list || list.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "muted";
+        empty.textContent = "Ігор не знайдено.";
+        content.appendChild(empty);
+        return;
+      }
+
+      // Группируем по дате
+      const grouped = {};
+      for (const x of list) {
+        grouped[x.date] = grouped[x.date] || [];
+        grouped[x.date].push(x);
+      }
+      const dates = Object.keys(grouped).sort((a,b) => b.localeCompare(a, "uk"));
+
+      for (const date of dates) {
+        const h = document.createElement("div");
+        h.className = "muted";
+        h.style.margin = "8px 0 6px";
+        h.textContent = date;
+        content.appendChild(h);
+
+        for (const item of grouped[date]) {
+          const g = item.game || {};
+          const number = (g.number != null ? `№${g.number}` : "№—");
+          const winner = g.winnerTeam ? (g.winnerTeam === "red" ? "червоні" : (g.winnerTeam === "black" ? "чорні" : "маніяк")) : "—";
+          const savedAt = g.savedAt ? new Date(g.savedAt).toLocaleString("uk-UA") : "";
+          const gameId = item.id;
+
+          const wrap = document.createElement("div");
+          wrap.className = "game";
+
+          const head = document.createElement("div");
+          head.className = "game-head";
+          head.innerHTML = `
+            <div>
+              <div class="game-title">${esc(date)} — ${esc(number)} — перемога: ${esc(winner)}</div>
+              <div class="game-sub">${esc(savedAt)}</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button class="danger-btn" type="button" data-del-date="${esc(date)}" data-del-id="${esc(gameId)}">Видалити</button>
+              <div class="muted">▾</div>
+            </div>
+          `;
+
+          const delBtn = head.querySelector('button.danger-btn');
+          if (delBtn) {
+            delBtn.addEventListener('click', async (ev) => {
+              ev.stopPropagation();
+              if (!auth.currentUser) { alert("Спочатку увійдіть."); return; }
+              if (!confirm(`Видалити игру ${date} ${number}?`)) return;
+              try {
+                await remove(ref(db, `${MOB_DB_ROOT}/gamesByDate/${date}/${gameId}`));
+              } catch (e) {
+                console.error(e);
+                alert("Не вдалося видалити гру.");
+              }
+            });
+          }
+
+
+          const body = document.createElement("div");
+          body.className = "game-body";
+
+          // Таблица игроков
+          const players = Array.isArray(g.players) ? g.players : [];
+          const savedScores = g.scores || {};
+          const calc = computeScoresFromGame(g);
+          const scores = (calc && calc.scores) ? calc.scores : savedScores;
+          const scoresNote = (calc && calc.note) ? calc.note : "";
+          const rowsHtml = players.map(p => {
+            const pid = p.playerId || "";
+            const scRaw = (pid && (scores[pid] != null)) ? scores[pid] : 0;
+            const sc = formatScore(scRaw);
+            return `<tr>
+              <td>${esc(p.seat)}</td>
+              <td>${esc(p.name || "")}</td>
+              <td>${esc(p.roleId || "")}</td>
+              <td>${esc(p.team || "")}</td>
+              <td>${esc(sc)}</td>
+            </tr>`;
+          }).join("");
+
+          body.innerHTML = `
+            <div class="muted" style="margin-bottom:8px;">Гравці та бали</div>
+            ${scoresNote ? ('<div class="muted" style="margin-bottom:8px;">' + esc(scoresNote) + '</div>') : ""}
+            <table>
+              <thead><tr><th>#</th><th>Гравець</th><th>Роль</th><th>Команда</th><th>Бали</th></tr></thead>
+              <tbody>${rowsHtml || ""}</tbody>
+            </table>
+
+            <button class="history-toggle" type="button" aria-expanded="false">Історія ▸</button>
+            <div class="history-body" hidden>
+              <pre>${esc(g.historyText || "")}</pre>
+            </div>
+          `;
+
+
+          const histBtn = body.querySelector(".history-toggle");
+          const histBody = body.querySelector(".history-body");
+          if (histBtn && histBody) {
+            histBtn.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              const willOpen = histBody.hasAttribute("hidden");
+              if (willOpen) histBody.removeAttribute("hidden");
+              else histBody.setAttribute("hidden", "");
+              histBtn.setAttribute("aria-expanded", String(willOpen));
+              histBtn.textContent = willOpen ? "Історія ▾" : "Історія ▸";
+            });
+          }
+
+          head.addEventListener("click", () => {
+            wrap.classList.toggle("open");
+          });
+
+          wrap.appendChild(head);
+          wrap.appendChild(body);
+          content.appendChild(wrap);
+        }
+      }
+    }
+
+    function applyFilter(){
+      const d = (filterDate.value || "").trim();
+      if (!d) {
+        render(flattenGames(allGamesByDate));
+        return;
+      }
+      const only = {};
+      if (allGamesByDate[d]) only[d] = allGamesByDate[d];
+      render(flattenGames(only));
+    }
+
+    // Применяем фильтр сразу при выборе даты
+    filterDate.addEventListener("change", applyFilter);
+    filterDate.addEventListener("input", applyFilter);
+
+    btnAll.addEventListener("click", () => {
+      filterDate.value = "";
+      applyFilter();
+    });
+
+    function renderFromRootSnapshot(snap) {
+      allGamesByDate = snap.val() || {};
+      applyFilter();
+    }
+</script>
+</body>
+</html>
