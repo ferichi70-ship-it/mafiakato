@@ -16,7 +16,7 @@ window.NIGHT_START = {
 window.nightStartFor = function(src, dur){
   var s = 10;
   try{
-    var name = decodeURIComponent(String(src||'').split('?')[0].split('#')[0].split('/').pop());
+    var name = (window.__blobName && window.__blobName[src]) || decodeURIComponent(String(src||'').split('?')[0].split('#')[0].split('/').pop());
     if (window.NIGHT_START && Object.prototype.hasOwnProperty.call(window.NIGHT_START, name)) s = window.NIGHT_START[name];
   }catch(_){}
   if (isFinite(dur) && dur > 0) s = Math.min(s, Math.max(0, dur - 0.5));

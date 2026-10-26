@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Ведение игры — Мафия</title>
 <script src="music/night-start.js"></script>
+<script src="music/offline.js"></script>
   <link rel="icon" href="data:,">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
   <style>
@@ -4096,7 +4097,7 @@ function fadeVol(from, to, ms, then) {
     try { audio.pause(); } catch (_) {}
     try {
       audio.currentTime = 0;
-      audio.src = tr.url;
+      audio.src = window.musicSrc ? window.musicSrc(tr.url) : tr.url;
       audio.load();
     } catch (_) {}
 
@@ -4160,7 +4161,7 @@ function fadeVol(from, to, ms, then) {
     try { audio.pause(); } catch (_) {}
     try {
       audio.currentTime = 0;
-      audio.src = tr.url;
+      audio.src = window.musicSrc ? window.musicSrc(tr.url) : tr.url;
       audio.load();
     } catch (_) {}
   }
@@ -4175,7 +4176,7 @@ function fadeVol(from, to, ms, then) {
     try { audio.pause(); } catch (_) {}
     try {
       audio.currentTime = 0;
-      audio.src = tr.url;
+      audio.src = window.musicSrc ? window.musicSrc(tr.url) : tr.url;
       audio.load();
     } catch (_) {}
 
@@ -4247,7 +4248,7 @@ function fadeVol(from, to, ms, then) {
         idx = (idx >= 0 && idx < playlist.length) ? idx : 0;
         try { localStorage.setItem(LS_IDX, String(idx)); } catch (_) {}
         try {
-          audio.src = playlist[idx].url;
+          audio.src = window.musicSrc ? window.musicSrc(playlist[idx].url) : playlist[idx].url;
           audio.load();
         } catch (_) {}
       }
@@ -7275,6 +7276,5 @@ initDefaults();
     }, { passive: false });
   })();
 </script>
-<script src="music/offline.js"></script>
 </body>
 </html>

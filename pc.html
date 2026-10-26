@@ -63,6 +63,7 @@ const iv = setInterval(()=>{
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mafia Syndicate Scorekeeper v5.0.2</title>
 <script src="music/night-start.js"></script>
+<script src="music/offline.js"></script>
 <style>
 :root{--gap:12px;--r:10px;--b:#e7e7ef;--a:#4b6bfb;--danger:#ff4d4f}
 *{box-sizing:border-box}
@@ -10729,7 +10730,7 @@ var p = idx - 1;
     function playIndex(i){
       if(i<0 || i>=playlist.length) return;
       idx = i;
-      audio.src = playlist[idx].url;
+      audio.src = window.musicSrc ? window.musicSrc(playlist[idx].url) : playlist[idx].url;
       audio.play().catch(function(){});
       render(); saveState();
     }
@@ -13603,7 +13604,6 @@ if (gateLoginBtn) {
 
 
 
-<script src="music/offline.js"></script>
 </body></html>
 
 <script>
