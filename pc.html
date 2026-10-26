@@ -63,7 +63,6 @@ const iv = setInterval(()=>{
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mafia Syndicate Scorekeeper v5.0.2</title>
 <script src="music/night-start.js"></script>
-<script src="music/offline.js"></script>
 <style>
 :root{--gap:12px;--r:10px;--b:#e7e7ef;--a:#4b6bfb;--danger:#ff4d4f}
 *{box-sizing:border-box}
@@ -10730,7 +10729,7 @@ var p = idx - 1;
     function playIndex(i){
       if(i<0 || i>=playlist.length) return;
       idx = i;
-      audio.src = window.musicSrc ? window.musicSrc(playlist[idx].url) : playlist[idx].url;
+      audio.src = playlist[idx].url;
       audio.play().catch(function(){});
       render(); saveState();
     }
@@ -10787,29 +10786,12 @@ function next(){
       }
       if(!playlist.length) return;
       playlist.sort(function(a,b){ return naturalCmp(a.title||filename(a.url), b.title||filename(b.url)); });
-      // Длительности берём из music/night-start.js (TRACK_DUR), а не качаем все треки сразу.
-      // Для треков без записанной длительности узнаём её по одному, в фоне.
-      var metaQueue = [];
       playlist.forEach(function(tr,i){
-        var n = filename(tr.url);
-        if (window.TRACK_DUR && window.TRACK_DUR[n]) tr.durSec = window.TRACK_DUR[n];
-        else metaQueue.push(i);
+        var a = new Audio(); a.preload='metadata'; a.src = tr.url;
+        a.addEventListener('loadedmetadata', function(){
+          if(isFinite(a.duration)){ playlist[i].durSec = a.duration; render(); }
+        }, {once:true});
       });
-      (function nextMeta(){
-        var i = metaQueue.shift(); if (i == null) return;
-        var a = new Audio(), done = false;
-        function fin(){
-          if (done) return; done = true;
-          if (isFinite(a.duration)){ playlist[i].durSec = a.duration; render(); }
-          try{ a.removeAttribute('src'); a.load(); }catch(_){}
-          setTimeout(nextMeta, 300);
-        }
-        a.preload = 'metadata';
-        a.addEventListener('loadedmetadata', fin, {once:true});
-        a.addEventListener('error', fin, {once:true});
-        setTimeout(fin, 8000);
-        a.src = playlist[i].url;
-      })();
       if(idx<0) idx=0;
       render();
       playIndex(idx);
