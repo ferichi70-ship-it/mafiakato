@@ -62,6 +62,7 @@ const iv = setInterval(()=>{
 
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mafia Syndicate Scorekeeper v5.0.2</title>
+<script src="music/night-start.js"></script>
 <style>
 :root{--gap:12px;--r:10px;--b:#e7e7ef;--a:#4b6bfb;--danger:#ff4d4f}
 *{box-sizing:border-box}
@@ -12183,7 +12184,7 @@ if(!document.__bmOpenBound){
         a = ensureAudio();
         if(!a) return;
         function startAfterMeta(){
-          try{ a.currentTime = Math.min((a.duration||10), 10); }catch(_){}
+          try{ a.currentTime = window.nightStartFor ? window.nightStartFor(a.currentSrc||a.src, a.duration) : Math.min((a.duration||10), 10); }catch(_){}
           try{ a.volume = 0; }catch(_){}
           try{ a.play && a.play(); }catch(_){}
           fadeVol(a, 0, 1, 3000);
@@ -13649,7 +13650,7 @@ if (gateLoginBtn) {
       var a = ensureAudio();
       if(!a) return;
       function startAfterMeta(){
-        try{ a.currentTime = Math.min((a.duration||10), 10); }catch(_){}
+        try{ a.currentTime = window.nightStartFor ? window.nightStartFor(a.currentSrc||a.src, a.duration) : Math.min((a.duration||10), 10); }catch(_){}
         try{ a.volume = 0; }catch(_){}
         try{ a.play && a.play(); }catch(_){}
         fadeVolume(a, 0, 1, 3000);
@@ -14156,7 +14157,7 @@ if (gateLoginBtn) {
       var a2 = ensureAudio() || a;
 
       function start(){
-        try{ a2.currentTime = Math.min((a2.duration||10), 10); }catch(_){}
+        try{ a2.currentTime = window.nightStartFor ? window.nightStartFor(a2.currentSrc||a2.src, a2.duration) : Math.min((a2.duration||10), 10); }catch(_){}
         try{
           var pr = a2.play && a2.play();
           if(pr && pr.catch) pr.catch(function(){});
