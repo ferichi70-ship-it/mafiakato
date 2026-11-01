@@ -2303,6 +2303,7 @@ function setStarSeat(seat) {
 
       // Ensure layout is measurable after becoming visible
       setTimeout(() => { try { fitDealRolesText(); } catch (_) {} }, 0);
+      try { localStorage.setItem("nightMusicGameKey", String(Date.now())); } catch (_) {} // раздача ролей = новая игра
       try { Music.onNightStart(); } catch (_) {}
     }
 
@@ -4085,8 +4086,15 @@ function fadeVol(from, to, ms, then) {
   function playNextFrom10WithFadeIn() {
     if (!playlist.length) return;
 
-    // next track in list
-    idx = (idx + 1) % playlist.length;
+    // ночь: случайная песня без повторов в пределах игры (см. music/night-start.js), иначе следующая
+    let pick = -1;
+    try {
+      if (window.pickNightTrack) {
+        let gk = "none"; try { gk = localStorage.getItem("nightMusicGameKey") || "none"; } catch (_) {}
+        pick = window.pickNightTrack(playlist.map((t) => filename(t.url)), gk, idx);
+      }
+    } catch (_) {}
+    idx = pick >= 0 ? pick : (idx + 1) % playlist.length;
     try { localStorage.setItem(LS_IDX, String(idx)); } catch (_) {}
     const tr = playlist[idx];
 

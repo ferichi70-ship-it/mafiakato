@@ -10741,6 +10741,16 @@ function next(){
         playIndex((idx+1) % playlist.length);
       }
     }
+    // Ночь: случайная песня без повторов в пределах игры (см. music/night-start.js)
+    window.nightNextTrack = function(){
+      if(!playlist.length || !window.pickNightTrack) return false;
+      var gameKey = 'none';
+      try{ var cg = (typeof Data!=='undefined' && Data.state) ? Data.state.currentGame : null; if(cg) gameKey = String(cg.gameCode || cg.timestamp || 'none'); }catch(_){}
+      var i = window.pickNightTrack(playlist.map(function(t){ return filename(t.url); }), gameKey, idx);
+      if(i < 0) return false;
+      playIndex(i);
+      return true;
+    };
     function prev(){
       if(!playlist.length) return;
       if(audio.currentTime>3){ audio.currentTime = 0; return; }
@@ -12152,6 +12162,7 @@ if(!document.__bmOpenBound){
     }catch(_){ return document.querySelector('audio'); }
   }
   function nextTrack(){
+    try{ if (window.nightNextTrack && window.nightNextTrack()) return; }catch(_){}
     var btn = document.getElementById('miniNext') || document.querySelector('#miniNext');
     if(btn) try{ btn.click(); }catch(_){}
   }
@@ -13604,7 +13615,7 @@ if (gateLoginBtn) {
   function $(sel, root){ return (root||document).querySelector(sel); }
   function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
   function ensureAudio(){ return $('#miniAudio') || $('audio#plAudio') || $('audio'); }
-  function nextTrack(){ var btn = $('#miniNext'); if(btn) try{ btn.click(); }catch(_){} }
+  function nextTrack(){ try{ if (window.nightNextTrack && window.nightNextTrack()) return; }catch(_){} var btn = $('#miniNext'); if(btn) try{ btn.click(); }catch(_){} }
 
 
   function oneTrack(){ return false; }
@@ -14117,6 +14128,7 @@ if (gateLoginBtn) {
     }catch(_){ return null; }
   }
   function nextTrack(){
+    try{ if (window.nightNextTrack && window.nightNextTrack()) return; }catch(_){}
     var btn = document.getElementById('miniNext') || document.querySelector('#miniNext');
     if(btn) try{ btn.click(); }catch(_){}
   }

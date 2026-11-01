@@ -22,3 +22,23 @@ window.nightStartFor = function(src, dur){
   if (isFinite(dur) && dur > 0) s = Math.min(s, Math.max(0, dur - 0.5));
   return s;
 };
+
+/* Случайный выбор песни ночью: в пределах одной игры песни не повторяются.
+   names — имена файлов плейлиста, gameKey — код текущей игры, currentIdx — что играет сейчас.
+   Когда все песни уже прозвучали в этой игре, круг начинается заново. */
+window.pickNightTrack = function(names, gameKey, currentIdx){
+  if (!names || !names.length) return -1;
+  var KEY = 'nightMusicUsed', st = { game: gameKey, used: [] };
+  try { var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && s.game === gameKey && Array.isArray(s.used)) st = s; } catch (_) {}
+  var cand = [];
+  for (var i = 0; i < names.length; i++) { if (i !== currentIdx && st.used.indexOf(names[i]) < 0) cand.push(i); }
+  if (!cand.length) {
+    st.used = [];
+    for (var j = 0; j < names.length; j++) { if (j !== currentIdx) cand.push(j); }
+    if (!cand.length) cand.push(0);
+  }
+  var pick = cand[Math.floor(Math.random() * cand.length)];
+  st.used.push(names[pick]);
+  try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (_) {}
+  return pick;
+};
