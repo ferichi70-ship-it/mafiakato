@@ -13045,7 +13045,8 @@ function updateBeginNight(){
     ref,
     get,
     set,
-    onValue
+    onValue,
+    runTransaction
   } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
   // === ТВОЙ РАБОЧИЙ CONFIG (скопируй из консоли и вставь сюда) ===
@@ -13067,6 +13068,77 @@ function updateBeginNight(){
 
   // Флаг, чтобы подписку onValue повесить только один раз
   let firebaseListenerAttached = false;
+
+  // ===== Синхронизация без затирания (3-сторонее слияние) =====
+  // syncBase — последняя версия базы, которую этот ноутбук видел. Изменения считаем относительно неё:
+  // что поменяли здесь — берём отсюда, что поменяли на другом устройстве (запись на игру, другой ноутбук) — берём оттуда.
+  let syncBase = null;
+  function deepClone(x){ try { return x == null ? x : JSON.parse(JSON.stringify(x)); } catch(_) { return x; } }
+  function isPlainObj(x){ return !!x && typeof x === "object" && !Array.isArray(x); }
+  function isEmptyVal(x){ return x == null || (Array.isArray(x) && x.length === 0) || (isPlainObj(x) && Object.keys(x).length === 0); }
+  function stableStr(x){
+    if (Array.isArray(x)) return "[" + x.map(stableStr).join(",") + "]";
+    if (isPlainObj(x)) {
+      return "{" + Object.keys(x).filter(k => k !== "lastUpdatedAt" && x[k] != null && !isEmptyVal(x[k])).sort()
+        .map(k => JSON.stringify(k) + ":" + stableStr(x[k])).join(",") + "}";
+    }
+    return JSON.stringify(x === undefined ? null : x);
+  }
+  function sameVal(a, b){
+    if (isEmptyVal(a) && isEmptyVal(b)) return true;
+    return stableStr(a) === stableStr(b);
+  }
+  // по какому полю различать элементы списка: игроки — id, игры в истории — timestamp, MVP дня — date
+  function listKeyFn(arrs){
+    const all = [].concat(...arrs.filter(Array.isArray));
+    if (!all.length) return null;
+    for (const f of ["id", "timestamp", "date"]) {
+      if (all.every(e => isPlainObj(e) && e[f] != null)) {
+        const ok = arrs.every(a => !Array.isArray(a) || new Set(a.map(e => String(e[f]))).size === a.length);
+        if (ok) return f;
+      }
+    }
+    return null;
+  }
+  function merge3(b, l, r){
+    if (sameVal(l, b)) return deepClone(r);   // здесь не меняли — берём из базы
+    if (sameVal(r, b)) return deepClone(l);   // в базе не меняли — берём отсюда
+    if (sameVal(l, r)) return deepClone(l);
+    // поменяли и тут, и там
+    if ((isPlainObj(l) || l == null) && (isPlainObj(r) || r == null) && (isPlainObj(b) || b == null)) {
+      const out = {};
+      const keys = new Set([...Object.keys(l || {}), ...Object.keys(r || {}), ...Object.keys(b || {})]);
+      keys.forEach(k => {
+        const v = merge3(b ? b[k] : undefined, l ? l[k] : undefined, r ? r[k] : undefined);
+        if (v !== undefined && v !== null) out[k] = v;
+      });
+      return out;
+    }
+    const lA = Array.isArray(l) || l == null, rA = Array.isArray(r) || r == null, bA = Array.isArray(b) || b == null;
+    if (lA && rA && bA) {
+      const f = listKeyFn([b, l, r]);
+      if (f) {
+        const toMap = a => { const m = new Map(); (a || []).forEach(e => m.set(String(e[f]), e)); return m; };
+        const bm = toMap(b), lm = toMap(l), rm = toMap(r);
+        const order = [];
+        (r || []).forEach(e => order.push(String(e[f])));
+        (l || []).forEach(e => { const k = String(e[f]); if (!rm.has(k)) order.push(k); });
+        const out = [];
+        order.forEach(k => {
+          const v = merge3(bm.get(k), lm.get(k), rm.get(k));
+          if (v !== undefined && v !== null) out.push(v);
+        });
+        return out;
+      }
+    }
+    return deepClone(l); // конфликт в одном и том же месте — побеждает этот ноутбук
+  }
+  function refreshUiSafe(){
+    try {
+      if (window.UI && typeof UI.refreshAll === "function") UI.refreshAll();
+      else if (window.UI && typeof UI.refresh === "function") UI.refresh();
+    } catch (_) {}
+  }
 
   const DB_PATH  = "words/state";                // где в БД лежит состояние
   const LOCAL_KEY = "mafia-scorekeeper-v4.8";    // твой ключ локального хранилища
@@ -13258,6 +13330,7 @@ if (gateLoginBtn) {
 
         if (!window.Data) window.Data = {};
         if (remote && typeof remote === "object") {
+          syncBase = deepClone(remote);
           Data.state = remote;
           normalizeState();
 
@@ -13288,31 +13361,22 @@ if (gateLoginBtn) {
 
           if (!window.Data) window.Data = {};
           if (remoteLive && typeof remoteLive === "object") {
-            // сравниваем версии: обновляем только если удалённая новее локальной
-            try {
-              var localTs = 0;
-              if (Data.state && Data.state.meta && typeof Data.state.meta.lastUpdatedAt === "number") {
-                localTs = Data.state.meta.lastUpdatedAt;
-              }
-              var remoteTs = 0;
-              if (remoteLive.meta && typeof remoteLive.meta.lastUpdatedAt === "number") {
-                remoteTs = remoteLive.meta.lastUpdatedAt;
-              }
-              if (remoteTs <= localTs) {
-                return; // локальное состояние не старее — ничего не делаем
-              }
-            } catch (_) {}
-            Data.state = remoteLive;
+            // Не сравниваем часы устройств: объединяем изменения из базы с тем, что есть здесь.
+            const localNow = (Data.state && typeof Data.state === "object") ? Data.state : {};
+            if (sameVal(remoteLive, localNow)) { syncBase = deepClone(remoteLive); return; }
+            const merged = merge3(syncBase || remoteLive, localNow, remoteLive);
+            syncBase = deepClone(remoteLive);
+            Data.state = merged;
             normalizeState();
 
             try {
               localStorage.setItem(LOCAL_KEY, JSON.stringify(Data.state));
             } catch (_) {}
 
-            try {
-              if (window.UI && typeof UI.refreshAll === "function") UI.refreshAll();
-              else if (window.UI && typeof UI.refresh === "function") UI.refresh();
-            } catch (_) {}
+            refreshUiSafe();
+
+            // если здесь были изменения, которых ещё нет в базе — досохраняем их (без затирания)
+            if (!sameVal(Data.state, remoteLive) && auth.currentUser) saveToFirebase(false);
           }
         });
         firebaseListenerAttached = true;
@@ -13339,8 +13403,31 @@ if (gateLoginBtn) {
     const payload = (window.Data && Data.state) ? Data.state : {};
     const fbPayload = encodeForFirebase(payload);  // <-- НОВОЕ
 
-    set(ref(db, DB_PATH), fbPayload)
-      .then(() => {
+    void fbPayload;
+    let localAtTx = null;
+    runTransaction(ref(db, DB_PATH), (current) => {
+      const local = (window.Data && Data.state) ? Data.state : {};
+      localAtTx = deepClone(local);
+      const remote = current ? decodeFromFirebase(current) : null;
+      let merged = remote ? merge3(syncBase || remote, local, remote) : deepClone(local);
+      if (!merged || typeof merged !== "object") merged = deepClone(local);
+      if (!merged.meta || typeof merged.meta !== "object") merged.meta = {};
+      merged.meta.lastUpdatedAt = Date.now();
+      return encodeForFirebase(merged);
+    }, { applyLocally: false })
+      .then((res) => {
+        if (res && res.committed && res.snapshot && res.snapshot.exists()) {
+          const saved = decodeFromFirebase(res.snapshot.val());
+          syncBase = deepClone(saved);
+          // подтягиваем в этот ноутбук то, что пришло с других устройств, не теряя свежих правок отсюда
+          const cur = (window.Data && Data.state) ? Data.state : {};
+          if (!sameVal(saved, cur)) {
+            Data.state = merge3(localAtTx || cur, cur, saved);
+            normalizeState();
+            try { localStorage.setItem(LOCAL_KEY, JSON.stringify(Data.state)); } catch (_) {}
+            refreshUiSafe();
+          }
+        }
         if (showMsg) alert("Данные сохранены в Firebase.");
       })
       .catch(e => {
