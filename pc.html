@@ -63,6 +63,7 @@ const iv = setInterval(()=>{
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mafia Syndicate Scorekeeper v5.0.2</title>
 <script src="music/night-start.js"></script>
+<script src="music/night-rules.js"></script>
 <style>
 :root{--gap:12px;--r:10px;--b:#e7e7ef;--a:#4b6bfb;--danger:#ff4d4f}
 *{box-sizing:border-box}
@@ -2709,6 +2710,14 @@ body.showing-night #audioMiniWrap, body.showing-roles #audioMiniWrap *{
       <td>Санта нашёл Гринча (× живых на момент действия)</td>
       <td><input id="ptsSantaFindGrinch" type="number" step="0.1" value="0.3"></td>
     </tr>
+    <tr>
+      <td>Телохранитель закрыл собой цель мафии (× живых на момент действия)</td>
+      <td><input id="ptsGuardSaveShot" type="number" step="0.1" value="0.5"></td>
+    </tr>
+    <tr>
+      <td>Телохранитель был залинчёван в первый день</td>
+      <td><input id="ptsGuardLynchedD1" type="number" step="0.1" value="-2"></td>
+    </tr>
 
   </tbody>
 </table>
@@ -2748,6 +2757,8 @@ body.showing-night #audioMiniWrap, body.showing-roles #audioMiniWrap *{
             <label class="rf"><input type="checkbox" data-rf="Маньяк"> маньяк</label>
             <label class="rf"><input type="checkbox" data-rf="Гринч"> гринч</label>
             <label class="rf"><input type="checkbox" data-rf="Санта"> санта</label>
+            <label class="rf"><input type="checkbox" data-rf="Телохранитель"> телохранитель</label>
+            <label class="rf"><input type="checkbox" data-rf="Бронежилет"> бронежилет</label>
             <button id="rfApply" type="button" class="primary" disabled>Применить</button>
             </div>
           </div>
@@ -2942,11 +2953,13 @@ const Data={state:{players:[],rules:{roles:[
   {name:'Журналист',team:'red',bonus:0},
   {name:'Маньяк',team:'red',bonus:0},
   {name:'Камикадзе',team:'red',bonus:0},
+  {name:'Телохранитель',team:'red',bonus:0},
+  {name:'Бронежилет',team:'red',bonus:0},
   {name:'Мирный',team:'red',bonus:0},
 ],points:{
   redWin:2,blackWin:2, redSurviveOnRedWin:1,
   donFindSheriff:0.3, hookSuccess:0.2, sheriffFindBlack:0.2, journalistDifferent:0.2, doctorSaveShot:0.3,
-  blackmailerFindJournalist:0.3, kamikazeTakeRed:-2, kamikazeTakeBlack:3, santaFindGrinch:0.3, doctorLynchedDay1:-2, sheriffLynchedDay1:-2, journalistLynchedDay1:-2, maniacWin:10
+  blackmailerFindJournalist:0.3, kamikazeTakeRed:-2, kamikazeTakeBlack:3, santaFindGrinch:0.3, doctorLynchedDay1:-2, sheriffLynchedDay1:-2, journalistLynchedDay1:-2, guardSaveShot:0.5, guardLynchedDay1:-2, maniacWin:10
 }},currentGame:null,history:[],fouls:{},mvpDays:[]}, 
 save(){try{localStorage.setItem(KEY,JSON.stringify(this.state));const s=document.getElementById('saveStatus');if(s){s.textContent='Сохранено ✓';setTimeout(function(){s.textContent='Сохранение локально';},1000)}}catch(e){App.err(e)}},
 load(){
@@ -3002,6 +3015,8 @@ function foulScopeKey(cg){
     if(P.doctorLynchedDay1===undefined) P.doctorLynchedDay1=-2;
     if(P.sheriffLynchedDay1===undefined) P.sheriffLynchedDay1=-2;
     if(P.journalistLynchedDay1===undefined) P.journalistLynchedDay1=-2;
+    if(P.guardSaveShot===undefined){ P.guardSaveShot=0.5; }
+    if(P.guardLynchedDay1===undefined){ P.guardLynchedDay1=-2; }
     if(changed){ Data.save(); }
   }catch(e){ try{ console.warn('migrate failed',e);}catch(_e){} }
 })();
@@ -3128,6 +3143,8 @@ savePoints:function(){
   P.doctorLynchedDay1=parseFloat((document.getElementById('ptsDoctorLynchedD1').value||'').toString().replace(',','.'))||0;
   P.sheriffLynchedDay1=parseFloat((document.getElementById('ptsSheriffLynchedD1').value||'').toString().replace(',','.'))||0;
   P.journalistLynchedDay1=parseFloat((document.getElementById('ptsJournalistLynchedD1').value||'').toString().replace(',','.'))||0;
+  var _eG=document.getElementById('ptsGuardSaveShot'); if(_eG) P.guardSaveShot=parseFloat((_eG.value||'').toString().replace(',','.'))||0;
+  var _eG1=document.getElementById('ptsGuardLynchedD1'); if(_eG1) P.guardLynchedDay1=parseFloat((_eG1.value||'').toString().replace(',','.'))||0;
   Data.save(); Modal.alert('Очки сохранены');
 },
 render:function(){
@@ -3159,14 +3176,17 @@ render:function(){
   var elD1=document.getElementById('ptsDoctorLynchedD1'); if(elD1) elD1.value = (P.doctorLynchedDay1||0);
   var elS1=document.getElementById('ptsSheriffLynchedD1'); if(elS1) elS1.value = (P.sheriffLynchedDay1||0);
   var elJ1=document.getElementById('ptsJournalistLynchedD1'); if(elJ1) elJ1.value = (P.journalistLynchedDay1||0);
+  var elG=document.getElementById('ptsGuardSaveShot'); if(elG) elG.value = ((P.guardSaveShot==null)?0.5:P.guardSaveShot);
+  var elG1=document.getElementById('ptsGuardLynchedD1'); if(elG1) elG1.value = ((P.guardLynchedDay1==null)?-2:P.guardLynchedDay1);
 },
 roleOptions:function(){
   var labelMap={
     'Дон':'ДОН','Маньяк':'МАНЬЯК','Комиссар':'КОМИССАР','Врач':'ВРАЧ',
     'Путана':'ПУТАНА','Журналист':'ЖУРНАЛИСТ','Мирный':'↑','Мафия':'↓',
-    'Шантажист':'ШАНТАЖИСТ','Камикадзе':'КАМИКАДЗЕ','Гринч':'ГРИНЧ','Санта':'САНТА'
+    'Шантажист':'ШАНТАЖИСТ','Камикадзе':'КАМИКАДЗЕ','Гринч':'ГРИНЧ','Санта':'САНТА',
+    'Телохранитель':'ТЕЛОХРАНИТЕЛЬ','Бронежилет':'БРОНЕЖИЛЕТ'
   };
-  var order=['Мирный','Мафия','Гринч','Дон','Путана','Шантажист','Санта','Комиссар','Журналист','Врач','Камикадзе','Маньяк'];
+  var order=['Мирный','Мафия','Гринч','Дон','Путана','Шантажист','Санта','Комиссар','Журналист','Врач','Телохранитель','Бронежилет','Камикадзе','Маньяк'];
   var byName={}; (Data.state.rules.roles||[]).forEach(function(r){ byName[r.name]=r; });
   return order.filter(function(name){ return byName[name]; }).map(function(name){
     var r=byName[name]; var label=(labelMap[name]!==undefined)?labelMap[name]:name;
@@ -4036,7 +4056,7 @@ for(var n3=1;n3<=8;n3++){
         (cg.players||[]).forEach(function(p){
           var key=p.playerId||('seat'+p.seat);
           var st1 = cg.grid[key] && cg.grid[key].nights ? (cg.grid[key].nights[0]||{}) : {};
-          if( (st1.shot && !st1.heal) || st1.maniac ){ victims.push(key); }
+          if( (NightRules.shotKills(st1)) || st1.maniac ){ victims.push(key); }
         });
         var singleVictim = victims.length===1 ? victims[0] : null;
         if(singleVictim){
@@ -4290,6 +4310,9 @@ stToLabel:function(st){
   if(st.sheriff)arr.push('?');
   if(st.journalist)arr.push('ж');
   if(st.heal)arr.push('+');
+  if(st.guard)arr.push('т');
+  if(st.vestSaved)arr.push('б');
+  if(st.guardDied)arr.push('т†');
   if(st.maniac)arr.push('м');
   var base = arr.length?arr.join(', '):'—';
   if(st && Array.isArray(st.bestMove) && st.bestMove.length){
@@ -4300,7 +4323,7 @@ stToLabel:function(st){
 firstUnfinalizedNight:function(){ var cg=Data.state.currentGame; if(!cg) return 1; for(var i=0;i<8;i++) if(!cg.nightFinalized[i]) return i+1; return 8; },
 aliveAtNightStart:function(player, night){
   var cg=Data.state.currentGame; var key=player.playerId||('seat'+player.seat); var rec=cg.grid[key];
-  for(var i=0;i<night-1;i++){ var s=rec.nights[i]; if((s.shot && !s.heal) || s.maniac) return false; }
+  for(var i=0;i<night-1;i++){ var s=rec.nights[i]; if((NightRules.shotKills(s)) || s.maniac) return false; }
   var lyn=rec.lynch; if(lyn==='исключен') return false; var nlyn=Number(lyn||0); if(nlyn && nlyn < night) return false;
   return true;
 },
@@ -4326,7 +4349,7 @@ finalizeNight:function(n){
   var aliveAtNightStart = function(player){
     var key = player.playerId||('seat'+player.seat);
     var rec = cg.grid[key];
-    for(var i=0;i<n-1;i++){ var s=rec.nights[i]; if((s.shot && !s.heal) || s.maniac) return false; }
+    for(var i=0;i<n-1;i++){ var s=rec.nights[i]; if((NightRules.shotKills(s)) || s.maniac) return false; }
     var lyn = rec.lynch;
     if(lyn==='исключен') return false;
     var nlyn = Number(lyn||0);
@@ -4380,6 +4403,7 @@ finalizeNight:function(n){
     return ks;
   }
   var prevHeal = prevTargetKey('heal');
+  var prevGuard = prevTargetKey('guard');
   var prevHook = prevTargetKey('hook');
   var prevJour = prevTwoKeys('journalist');
 
@@ -4416,7 +4440,7 @@ finalizeNight:function(n){
   };
 
   // Count marks on grid (by targets)
-  var marks={shot:0,don:0,blackmail:0,hook:0,sheriff:0,journalist:0,heal:0,maniac:0};
+  var marks={shot:0,don:0,blackmail:0,hook:0,sheriff:0,journalist:0,heal:0,guard:0,maniac:0};
   Object.keys(cg.grid).forEach(function(k){
     var st=cg.grid[k].nights[n-1];
     if(!st) return;
@@ -4472,6 +4496,14 @@ finalizeNight:function(n){
       }
     }
   }
+  try{
+    var guardP2 = findRole('Телохранитель');
+    if(guardP2 && !isHooked(guardP2)){
+      var gSelf = guardP2.playerId||('seat'+guardP2.seat);
+      var availGuard = aliveTargets(gSelf).filter(function(K){ return K!==prevGuard; }).length;
+      if(availGuard>=1 && marks.guard!==1) missing.push('Телохранитель (охрана)');
+    }
+  }catch(_g){}
   if(doctorP && !isHooked(doctorP)){
     if(availHeal<1){}
     else if(marks.heal!==1) missing.push('Врач (лечение)');
@@ -4509,7 +4541,7 @@ finalizeNight:function(n){
   var victimsKeys=[];
   Object.keys(cg.grid).forEach(function(k){
     var st=cg.grid[k].nights[n-1]; if(!st) return;
-    if(st.shot && !st.heal) victimsKeys.push(k);
+    if(NightRules.shotKills(st)) victimsKeys.push(k);
     if(st.maniac) victimsKeys.push(k);
   });
   // dedupe
@@ -4564,7 +4596,7 @@ recomputeAlive:function(){
     var key=a.playerId||('seat'+a.seat);
     var rec=cg.grid[key];
     if(rec.lynch) dead = true;
-    for(var i=0;i<8;i++){ var s=rec.nights[i]; if((s.shot && !s.heal) || s.maniac){ dead=true; break; } }
+    for(var i=0;i<8;i++){ var s=rec.nights[i]; if((NightRules.shotKills(s)) || s.maniac){ dead=true; break; } }
     a.alive=!dead;
     var role=Rules.roleByName(a.role)||{team:'red'}; a.team=role.team;
   });
@@ -4599,7 +4631,7 @@ checkInstantVictory:function(){
       var has=false; 
       Object.keys(cg.grid||{}).forEach(function(k){ 
         (cg.grid[k].nights||[]).forEach(function(s){ 
-          if(s && (s.shot||s.heal||s.hook||s.blackmail||s.sheriff||s.journalist||s.maniac)) has=true; 
+          if(s && (s.shot||s.heal||s.guard||s.hook||s.blackmail||s.sheriff||s.journalist||s.maniac)) has=true; 
         }); 
       }); 
       return has; 
@@ -4732,7 +4764,7 @@ finalize:function(){
       return (cg.players||[]).filter(function(p){
         var key = p.playerId||('seat'+p.seat);
         var rec = cg.grid[key];
-        for(var i=0;i<n-1;i++){ var s=rec.nights[i]; if(s && s.shot && !s.heal) return false; }
+        for(var i=0;i<n-1;i++){ var s=rec.nights[i]; if(s && NightRules.shotKills(s)) return false; }
         var lyn = rec.lynch;
         if(lyn==='исключен') return false;
         var nlyn = Number(lyn||0);
@@ -4760,7 +4792,7 @@ finalize:function(){
     });
   });
 
-  var activeRoles = new Set(['Дон','Мафия','Гринч','Путана','Шантажист','Санта','Комиссар','Врач','Журналист']);
+  var activeRoles = new Set(['Дон','Мафия','Гринч','Путана','Шантажист','Санта','Комиссар','Врач','Журналист','Телохранитель']);
   cg.players.forEach(function(target){
     var active = activeRoles.has(target.role);
     cg.grid[target.playerId||('seat'+target.seat)].nights.forEach(function(st, _i){ var _alive=aliveCountAtNightStart(_i+1); if(st.hook && active) add(scores, playersByRole('Путана'), P.hookSuccess*_alive); });
@@ -4780,6 +4812,8 @@ finalize:function(){
     if(blackmailed.some(function(b){return b.role==='Журналист'})){ var _alive=aliveCountAtNightStart(n+1); add(scores, playersByRole('Шантажист'), P.blackmailerFindJournalist*_alive); }
   }
   cg.players.forEach(function(target){ cg.grid[target.playerId||('seat'+target.seat)].nights.forEach(function(st, _i){ var _alive=aliveCountAtNightStart(_i+1); if(st.heal && st.shot) add(scores, playersByRole('Врач'), P.doctorSaveShot*_alive); }); });
+  // Телохранитель закрыл собой цель мафии
+  try{ NightRules.ensure(); cg.players.forEach(function(g){ if(g.role!=='Телохранитель') return; var gr=cg.grid[g.playerId||('seat'+g.seat)]; (gr&&gr.nights||[]).forEach(function(st,_i){ if(st && st.guardDied){ var _alive=aliveCountAtNightStart(_i+1); add(scores,[g.playerId], ((P.guardSaveShot==null)?0.5:P.guardSaveShot)*_alive); } }); }); }catch(_eG){}
   Game.recomputeAlive();
   
   
@@ -4789,7 +4823,7 @@ finalize:function(){
     (cg.players||[]).forEach(function(a){
       var key=a.playerId||('seat'+a.seat);
       var st1 = cg.grid[key] && cg.grid[key].nights && cg.grid[key].nights[0];
-      if(st1 && st1.shot && !st1.heal && Array.isArray(st1.bestMove)){
+      if(st1 && NightRules.shotKills(st1) && Array.isArray(st1.bestMove)){
         var correct = st1.bestMove.filter(function(s){ return blackSeats.has(Number(s)); }).length;
         if(correct>0) add(scores,[a.playerId],correct);
       }
@@ -4803,6 +4837,7 @@ try{
         if(a.role==='Врач') add(scores,[a.playerId],(P.doctorLynchedDay1||0));
         if(a.role==='Комиссар') add(scores,[a.playerId],(P.sheriffLynchedDay1||0));
         if(a.role==='Журналист') add(scores,[a.playerId],(P.journalistLynchedDay1||0));
+        if(a.role==='Телохранитель') add(scores,[a.playerId],((P.guardLynchedDay1==null)?-2:P.guardLynchedDay1));
       }
     });
   }catch(_e){}  
@@ -4882,7 +4917,7 @@ if(winner==='red'){ cg.players.forEach(function(a){ if(a.team==='red' && a.alive
         nights: (rec.nights||[]).map(function(st){
           st=st||{}; return {
             shot: !!st.shot, don: !!st.don, hook: !!st.hook, blackmail: !!st.blackmail,
-            sheriff: !!st.sheriff, journalist: !!st.journalist, maniac: !!st.maniac, heal: !!st.heal, bestMove: (Array.isArray(st.bestMove)? st.bestMove.slice() : (st.bestMove? [].concat(st.bestMove) : null))
+            sheriff: !!st.sheriff, journalist: !!st.journalist, maniac: !!st.maniac, heal: !!st.heal, guard: !!st.guard, guarded: !!st.guarded, guardDied: !!st.guardDied, vestSaved: !!st.vestSaved, bestMove: (Array.isArray(st.bestMove)? st.bestMove.slice() : (st.bestMove? [].concat(st.bestMove) : null))
           };
         })
       };
@@ -4890,8 +4925,8 @@ if(winner==='red'){ cg.players.forEach(function(a){ if(a.team==='red' && a.alive
     var labels = {};
     Object.keys(gridById).forEach(function(k){
       labels[k] = (gridById[k].nights||[]).map(function(st, idx){
-        var a=[]; if(st.shot)a.push('→'); if(st.don)a.push('д'); if(st.blackmail)a.push('ш'); if(st.hook)a.push('х'); if(st.sheriff)a.push('?'); if(st.journalist)a.push('ж'); if(st.heal)a.push('+'); if(st.maniac)a.push('м');
-        if(idx===0 && st.shot && !st.heal){
+        var a=[]; if(st.shot)a.push('→'); if(st.don)a.push('д'); if(st.blackmail)a.push('ш'); if(st.hook)a.push('х'); if(st.sheriff)a.push('?'); if(st.journalist)a.push('ж'); if(st.heal)a.push('+'); if(st.guard)a.push('т'); if(st.vestSaved)a.push('б'); if(st.guardDied)a.push('т†'); if(st.maniac)a.push('м');
+        if(idx===0 && NightRules.shotKills(st)){
           try{
             var bm = (gridById[k] && gridById[k].nights && gridById[k].nights[0] && gridById[k].nights[0].bestMove) || null;
             if(Array.isArray(bm) && bm.length){ a.push('<span class="bestmove">'+bm.join(', ')+'</span>'); }
@@ -4947,7 +4982,7 @@ createDay:function(dayNum, prepend){
 aliveAtStartOfDay:function(pkey, day, cg){
   var rec = cg.grid[pkey];
   if(!rec) return true;
-  for(var i=0;i<day;i++){ var s=rec.nights[i]; if (s && ((s.shot && !s.heal) || s.maniac)) return false; }
+  for(var i=0;i<day;i++){ var s=rec.nights[i]; if (s && ((NightRules.shotKills(s)) || s.maniac)) return false; }
   var lyn = rec.lynch;
   if(lyn==='исключен') return false;
   var nlyn = Number(lyn||0);
@@ -5096,19 +5131,20 @@ const Panel = {
     var prev = night>1 ? cg.grid[pkey].nights[night-2] : null;
     var disHookPrev = prev? prev.hook : false;
     var disHealPrev = prev? prev.heal : false;
+    var disGuardPrev = prev? prev.guard : false;
     var disJournalistPrev = prev? prev.journalist : false;
 
-    var counts={shot:0,don:0,blackmail:0,hook:0,sheriff:0,journalist:0,heal:0,maniac:0};
+    var counts={shot:0,don:0,blackmail:0,hook:0,sheriff:0,journalist:0,heal:0,guard:0,maniac:0};
     Object.values(cg.grid).forEach(function(rec){
       var ns = rec.nights[night-1];
       Object.keys(counts).forEach(function(k){ counts[k]+= ns[k]?1:0; });
     });
-    var limits={shot:1, don:1, blackmail:1, hook:1, sheriff:1, journalist:2, heal:1, maniac:1};
+    var limits={shot:1, don:1, blackmail:1, hook:1, sheriff:1, journalist:2, heal:1, guard:1, maniac:1};
 
     var aliveAtNightStart = function(player){
       var key = player.playerId||('seat'+player.seat);
       var rec = cg.grid[key];
-      for(var i=0;i<night-1;i++){ var s=rec.nights[i]; if((s.shot && !s.heal) || s.maniac) return false; }
+      for(var i=0;i<night-1;i++){ var s=rec.nights[i]; if((NightRules.shotKills(s)) || s.maniac) return false; }
       var lyn = rec.lynch;
       if(lyn==='исключен') return false;
       var nlyn = Number(lyn||0);
@@ -5117,7 +5153,7 @@ const Panel = {
     };
     var targetAlive = (function(){
       var rec = cg.grid[pkey];
-      for(var i=0;i<night-1;i++){ var s=rec.nights[i]; if((s.shot && !s.heal) || s.maniac) return false; }
+      for(var i=0;i<night-1;i++){ var s=rec.nights[i]; if((NightRules.shotKills(s)) || s.maniac) return false; }
       var lyn = rec.lynch;
       var nlyn = Number(lyn||0);
       if(lyn==='исключен') return false;
@@ -5133,6 +5169,7 @@ const Panel = {
     var sheriffPlayer = findRole('Комиссар');
     var journalistPlayer = findRole('Журналист');
     var doctorPlayer = findRole('Врач');
+    var guardPlayer = findRole('Телохранитель');
     var maniacPlayer = findRole('Маньяк');
     var santaPlayer = findRole('Санта');
     function isHooked(player){
@@ -5144,6 +5181,7 @@ const Panel = {
     var sheriffHooked = isHooked(sheriffPlayer);
     var journalistHooked = isHooked(journalistPlayer);
     var doctorHooked = isHooked(doctorPlayer);
+    var guardHooked = isHooked(guardPlayer);
     var maniacHooked = isHooked(maniacPlayer);
     var santaHooked = isHooked(santaPlayer);
     var isTargetSelfFor = function(player){
@@ -5170,6 +5208,7 @@ const Panel = {
       {k:'sheriff', label:'? комиссар проверяет', show: !!sheriffPlayer, dis: sheriffHooked},
       {k:'journalist', label:'ж журналист проверяет', show: !!journalistPlayer, dis: (journalistHooked || disJournalistPrev || isTargetSelfFor(journalistPlayer))},
       {k:'heal', label:'+ врач лечит', show: !!doctorPlayer, dis: (doctorHooked || disHealPrev)},
+      {k:'guard', label:'т телохранитель охраняет', show: !!guardPlayer, dis: (guardHooked || disGuardPrev || isTargetSelfFor(guardPlayer))},
       {k:'maniac', label:'м маньяк убивает', show: !!maniacPlayer, dis: maniacHooked}
     ];
     // Hide Don action in later nights if he already found the Sheriff earlier
@@ -5225,7 +5264,7 @@ const Panel = {
       cb.onchange = function(e){
         var key = e.target.getAttribute('data-k');
         // Per-night singletons: when enabling, clear the same key on all other players for this night
-        var singletons = {shot:1, don:1, blackmail:1, hook:1, sheriff:1, heal:1, maniac:1};
+        var singletons = {shot:1, don:1, blackmail:1, hook:1, sheriff:1, heal:1, guard:1, maniac:1};
         if(singletons[key] && e.target.checked){
           Object.keys(cg.grid).forEach(function(K){
             var rec = cg.grid[K]; if(rec && rec.nights && rec.nights[night-1]) rec.nights[night-1][key] = false;
@@ -5240,7 +5279,7 @@ const Panel = {
       };
     });
 var clr=panel.querySelector('#fp-clear'); if(clr) clr.onclick = function(){
-      Object.assign(st,{shot:false,don:false,hook:false,blackmail:false,sheriff:false,journalist:false,heal:false,maniac:false});
+      Object.assign(st,{shot:false,don:false,hook:false,blackmail:false,sheriff:false,journalist:false,heal:false,guard:false,maniac:false});
       Data.save(); Game.updateNightCell(pkey, night, anchor); try{ Game.recomputeAlive(); Game.render(); }catch(_e){}
     };
     var ok=panel.querySelector('#fp-done'); if(ok) ok.onclick = Panel.close;
@@ -5270,7 +5309,7 @@ const KamikazeLynch={
         var nights = rec.nights || [];
         for(var i=0;i<nights.length;i++){
           var st = nights[i] || {};
-          if((st.shot && !st.heal) || st.maniac){ return false; }
+          if((NightRules.shotKills(st)) || st.maniac){ return false; }
         }
         return true;
       }
@@ -6372,7 +6411,7 @@ var want = saved || lastTab() || currentTabAttr() || 'players';  // выбери
 (function(){
   // Global night wizard
   window.NightWizard = (function(){
-    var order = ['shot','don','blackmail','hook','santa','sheriff','journalist','heal','maniac'];
+    var order = ['shot','don','blackmail','hook','santa','sheriff','journalist','heal','guard','maniac'];
         var titles = {
       shot:'Мафия стреляет',
       don:'Дон проверяет',
@@ -6382,6 +6421,7 @@ var want = saved || lastTab() || currentTabAttr() || 'players';  // выбери
       sheriff:'Комиссар проверяет',
       journalist:'Журналист проверяет',
       heal:'Врач лечит',
+      guard:'Телохранитель охраняет',
       maniac:'Маньяк убивает'
     };
     var state = {night:1, step:0, jourChosen:[]};
@@ -6389,7 +6429,7 @@ var want = saved || lastTab() || currentTabAttr() || 'players';  // выбери
     function aliveAtNightStart(cg, player){
       var key = player.playerId||('seat'+player.seat);
       var rec = cg.grid[key];
-      for(var i=0;i<state.night-1;i++){ var s=rec.nights[i]; if ((s.shot && !s.heal) || s.maniac) return false; }
+      for(var i=0;i<state.night-1;i++){ var s=rec.nights[i]; if ((NightRules.shotKills(s)) || s.maniac) return false; }
       var lyn = rec.lynch;
       if(lyn==='исключен') return false;
       var nlyn = Number(lyn||0);
@@ -6421,6 +6461,8 @@ var hookP    = findRole(cg,'Путана');
       var journP   = findRole(cg,'Журналист');
       var journAny  = cg.players.find(function(p){ return p.role==='Журналист'; }) || null;
       var doctorP  = findRole(cg,'Врач');
+      var guardP   = findRole(cg,'Телохранитель');
+      var guardAny = cg.players.find(function(p){ return p.role==='Телохранитель'; }) || null;
       var maniacP  = findRole(cg,'Маньяк');
       var blackmailerP = findRole(cg,'Шантажист');
       var blackmailerAny = (cg.players || []).find(function(p){ return p.role==='Шантажист'; }) || null;
@@ -6437,7 +6479,7 @@ var hookP    = findRole(cg,'Путана');
           // смерть от выстрела/маньяка в предыдущие ночи
           for(var i=0;i<n-1;i++){
             var s = rec.nights[i];
-            if(s && ((s.shot && !s.heal) || s.maniac)) return false;
+            if(s && ((NightRules.shotKills(s)) || s.maniac)) return false;
           }
           var lyn = rec.lynch;
           if(lyn === 'исключен') return false;
@@ -6470,7 +6512,7 @@ var hookP    = findRole(cg,'Путана');
         return cg.players.filter(function(p){ return p.playerId && (function(player){
           var key = player.playerId||('seat'+player.seat);
           var rec = cg.grid[key];
-          for(var i=0;i<n-1;i++){ var s=rec.nights[i]; if((s.shot && !s.heal) || s.maniac) return false; }
+          for(var i=0;i<n-1;i++){ var s=rec.nights[i]; if((NightRules.shotKills(s)) || s.maniac) return false; }
           var lyn = rec.lynch;
           if(lyn==='исключен') return false;
           var nlyn = Number(lyn||0);
@@ -6533,6 +6575,7 @@ var santaFoundGrinchPreviously = (function(){
         sheriff: !!sheriffAny,
         journalist: !!journAny,
         heal: !!doctorAny,
+        guard: !!guardAny,
         maniac: !!(cg.players||[]).some(function(p){return p.role==='Маньяк';})
       };
 
@@ -6545,10 +6588,11 @@ var santaFoundGrinchPreviously = (function(){
         maniac: maniacP ? aliveTargets(null) : [],
         sheriff: sheriffP ? aliveTargets(pkeySheriff) : [],
         journalist: journP ? aliveTargets((journP.playerId||('seat'+journP.seat))) : [],
-        heal: doctorP ? aliveTargets(null) : []
+        heal: doctorP ? aliveTargets(null) : [],
+        guard: guardP ? aliveTargets((guardP.playerId||('seat'+guardP.seat))) : []
       };
 
-      return {avail:avail, show:show, roles:{don:donP, hook:hookP, santa:santaP, sheriff:sheriffP, journalist:journP, doctor:doctorP}, prev:{hook:prevHook, heal:prevHeal, jour:prevJour, jourLast:prevJourLast, jourForcedSkip:jourForcedSkip, jourAlt:_jourAlt}, flags:{donFoundSheriffPreviously:donFoundSheriffPreviously, santaFoundGrinchPreviously:santaFoundGrinchPreviously, blackmailerFoundJournalistPreviously:blackmailerFoundJournalistPreviously, blackmailerAlive:blackmailerAlive, hasDonAny:!!donAny, hasHookAny:!!hookAny, hasSantaAny:!!santaAny, hasSheriffAny:!!sheriffAny, hasJournAny:!!journAny, hasDoctorAny:!!doctorAny, hasGrinchAny:!!grinchAny}};
+      return {avail:avail, show:show, roles:{don:donP, hook:hookP, santa:santaP, sheriff:sheriffP, journalist:journP, doctor:doctorP, guard:guardP}, prev:{hook:prevHook, heal:prevHeal, guard:prevTarget('guard'), jour:prevJour, jourLast:prevJourLast, jourForcedSkip:jourForcedSkip, jourAlt:_jourAlt}, flags:{donFoundSheriffPreviously:donFoundSheriffPreviously, santaFoundGrinchPreviously:santaFoundGrinchPreviously, blackmailerFoundJournalistPreviously:blackmailerFoundJournalistPreviously, blackmailerAlive:blackmailerAlive, hasDonAny:!!donAny, hasHookAny:!!hookAny, hasSantaAny:!!santaAny, hasSheriffAny:!!sheriffAny, hasJournAny:!!journAny, hasDoctorAny:!!doctorAny, hasGrinchAny:!!grinchAny}};
     }
 
     function setFlag(cg, flagKey, targetKey){
@@ -6658,7 +6702,7 @@ close(); return; }
           var maniacAny = (cg.players || []).some(function(p){ return p.role === 'Маньяк'; });
           var maniacAliveNow = !!findRole(cg, 'Маньяк');
           if (maniacAny && !maniacAliveNow) {
-            var titleMap = {shot:'Мафия стреляет', don:'Дон проверяет', blackmail:'Шантажист ищет журналиста', hook:'Путана блокирует', santa:'Санта ищет Гринча', sheriff:'Комиссар проверяет', journalist:'Журналист проверяет', heal:'Врач лечит', maniac:'Маньяк убивает'};
+            var titleMap = {shot:'Мафия стреляет', don:'Дон проверяет', blackmail:'Шантажист ищет журналиста', hook:'Путана блокирует', santa:'Санта ищет Гринча', sheriff:'Комиссар проверяет', journalist:'Журналист проверяет', heal:'Врач лечит', guard:'Телохранитель охраняет', maniac:'Маньяк убивает'};
             var wiz = document.getElementById('nightWizard');
             if (wiz) wiz.style.display = 'flex';
             document.getElementById('wizTitle').textContent = 'Ночь ' + state.night + ': ' + titleMap[act];
@@ -6781,7 +6825,7 @@ return;
       }
 
 
-      var titleMap = {shot:'Мафия стреляет', don:'Дон проверяет', blackmail:'Шантажист ищет журналиста', hook:'Путана путанит', santa:'Санта ищет Гринча', sheriff:'Комиссар проверяет', journalist:'Журналист проверяет', heal:'Врач лечит', maniac:'Маньяк убивает'};
+      var titleMap = {shot:'Мафия стреляет', don:'Дон проверяет', blackmail:'Шантажист ищет журналиста', hook:'Путана путанит', santa:'Санта ищет Гринча', sheriff:'Комиссар проверяет', journalist:'Журналист проверяет', heal:'Врач лечит', guard:'Телохранитель охраняет', maniac:'Маньяк убивает'};
       document.getElementById('wizTitle').textContent = 'Ночь '+state.night+': '+titleMap[act];
       var hintEl = document.getElementById('wizHint');
       var cont = document.getElementById('wizPlayers'); cont.innerHTML='';
@@ -6798,7 +6842,7 @@ return;
           function aliveAtNightStartKey(key){
             var rec = cg.grid[key];
             if(!rec) return true;
-            for(var i=0;i<nNow-1;i++){ var s=rec.nights[i]; if (s && ((s.shot && !s.heal) || s.maniac)) return false; }
+            for(var i=0;i<nNow-1;i++){ var s=rec.nights[i]; if (s && ((NightRules.shotKills(s)) || s.maniac)) return false; }
             var lyn = rec.lynch;
             if(lyn==='исключен') return false;
             var nlyn = Number(lyn||0);
@@ -7631,6 +7675,13 @@ wiz.style.display='flex';
         return;
       }
 
+      // Телохранитель: мёртв / запутан
+      if(act==='guard'){
+        if(!data.roles.guard){ return showMessage('МЕРТВ'); }
+        if((function(){ var p=data.roles.guard; var key=p.playerId||('seat'+p.seat); var s = cg.grid[key].nights[state.night-1]; return !!(s && s.hook); })()){
+          return showMessage('ЗАПУТАНЕН');
+        }
+      }
       // 1) Hooked role cannot act this night -> message only
       if(act==='sheriff' && data.roles.sheriff && (function(){ var p=data.roles.sheriff; var key=p.playerId||('seat'+p.seat); var s = cg.grid[key].nights[state.night-1]; return !!(s && s.hook); })()){
         return showMessage('ЗАПУТАНЕН');
@@ -7686,10 +7737,10 @@ wiz.style.display='flex';
       // 2) Build buttons with per-rule disabling
       hintEl.textContent = (act==='journalist') ? 'Выберите ДВУХ разных игроков' : '';
       var selfKey = (function(){
-        var rp = (act==='sheriff'?data.roles.sheriff : act==='journalist'?data.roles.journalist : act==='heal'?data.roles.doctor : act==='hook'?data.roles.hook : null);
+        var rp = (act==='sheriff'?data.roles.sheriff : act==='journalist'?data.roles.journalist : act==='heal'?data.roles.doctor : act==='guard'?data.roles.guard : act==='hook'?data.roles.hook : null);
         return rp ? (rp.playerId||('seat'+rp.seat)) : null;
       })();
-      var prevSame = (act==='journalist') ? data.prev.jour : (act==='heal') ? (data.prev.heal?[data.prev.heal]:[]) : (act==='hook') ? (data.prev.hook?[data.prev.hook]:[]) : [];
+      var prevSame = (act==='journalist') ? data.prev.jour : (act==='heal') ? (data.prev.heal?[data.prev.heal]:[]) : (act==='guard') ? (data.prev.guard?[data.prev.guard]:[]) : (act==='hook') ? (data.prev.hook?[data.prev.hook]:[]) : [];
       // Определяем комиссара (для отображения при проверке Доном)
       var sheriffAnySeat = null;
       try {
@@ -7742,7 +7793,8 @@ targets.forEach(function(t){
 
         var dis = (t.alive===false && act!=='don' && act!=='blackmail');
         // Rule 2: journalist/doctor/putana cannot target same as previous night
-        if((act==='journalist' || act==='heal' || act==='hook') && prevSame && prevSame.indexOf && prevSame.indexOf(t.key)!==-1){ dis=true; }
+        if((act==='journalist' || act==='heal' || act==='guard' || act==='hook') && prevSame && prevSame.indexOf && prevSame.indexOf(t.key)!==-1){ dis=true; }
+        if(act==='guard' && selfKey && t.key===selfKey){ dis=true; }
         if((act==='heal' || act==='hook') && !prevSame && (t.key===data.prev.heal || t.key===data.prev.hook)){ dis=true; }
         // Rule 3: journalist cannot self or dead (dead уже отфильтрованы, но self проверим)
         if(act==='journalist' && selfKey && t.key===selfKey){ dis=true; }
@@ -7907,6 +7959,8 @@ document.getElementById('wizCancel').onclick=function(){ var wiz = document.getE
       { key: 'doctor',      title: 'ВРАЧ',       role: 'Врач',       multiple: false },
       { key: 'maniac',      title: 'МАНЬЯК',     role: 'Маньяк',     multiple: false },
       { key: 'kamikaze',    title: 'КАМИКАДЗЕ',  role: 'Камикадзе',  multiple: false },
+      { key: 'bodyguard',   title: 'ТЕЛОХРАНИТЕЛЬ', role: 'Телохранитель', multiple: false },
+      { key: 'vest',        title: 'БРОНЕЖИЛЕТ', role: 'Бронежилет', multiple: false },
     ],
     selections: null,
     selectedBySeat: null,
@@ -7922,7 +7976,7 @@ document.getElementById('wizCancel').onclick=function(){ var wiz = document.getE
           return; 
         }
 
-        this.selections = { don:null, blackmailer:null, hooker:null, mafia:new Set(), sheriff:null, journalist:null, doctor:null, maniac:null, kamikaze:null };
+        this.selections = { don:null, blackmailer:null, hooker:null, mafia:new Set(), sheriff:null, journalist:null, doctor:null, maniac:null, kamikaze:null, bodyguard:null, vest:null };
         this.selectedBySeat = {}; // seat -> group key (or "mafia")
 
         var N = (cg.players && cg.players.length) ? cg.players.length : 10;
@@ -8057,6 +8111,8 @@ document.getElementById('wizCancel').onclick=function(){ var wiz = document.getE
         if(this.selections.doctor)      seatRole[this.selections.doctor]      = 'Врач';
         if(this.selections.maniac)      seatRole[this.selections.maniac]      = 'Маньяк';
         if(this.selections.kamikaze)    seatRole[this.selections.kamikaze]    = 'Камикадзе';
+        if(this.selections.bodyguard)   seatRole[this.selections.bodyguard]   = 'Телохранитель';
+        if(this.selections.vest)        seatRole[this.selections.vest]        = 'Бронежилет';
         this.selections.mafia.forEach(function(seat){ seatRole[seat] = 'Мафия'; });
 
         // Prefer updating the existing UI selects (triggers built-in onchange handlers)
@@ -8180,7 +8236,7 @@ function buildSnapshotTables(){
     head += "<th>Линч</th><th>Фолы</th><th>Очки</th></tr></thead><tbody></tbody>";
     gt.innerHTML = head;
     var gtb = gt.querySelector('tbody');
-    function localLabel(st){ st=st||{}; var a=[]; if(st.shot)a.push('→'); if(st.don)a.push('д'); if(st.blackmail)a.push('ш'); if(st.hook)a.push('х'); if(st.sheriff)a.push('?'); if(st.journalist)a.push('ж'); if(st.heal)a.push('+'); if(st.maniac)a.push('м'); var base=a.length?a.join(', '):'—'; if(st && Array.isArray(st.bestMove) && st.bestMove.length && st.shot && !st.heal){ base += ' <span class="bestmove">'+ st.bestMove.join(', ') +'</span>'; } return base; }
+    function localLabel(st){ st=st||{}; var a=[]; if(st.shot)a.push('→'); if(st.don)a.push('д'); if(st.blackmail)a.push('ш'); if(st.hook)a.push('х'); if(st.sheriff)a.push('?'); if(st.journalist)a.push('ж'); if(st.heal)a.push('+'); if(st.guard)a.push('т'); if(st.vestSaved)a.push('б'); if(st.guardDied)a.push('т†'); if(st.maniac)a.push('м'); var base=a.length?a.join(', '):'—'; if(st && Array.isArray(st.bestMove) && st.bestMove.length && NightRules.shotKills(st)){ base += ' <span class="bestmove">'+ st.bestMove.join(', ') +'</span>'; } return base; }
     var __mvpId = (snap && snap.mvpId) || (g && g.mvpId) || null; var __mvpBonus = (snap && (typeof snap.mvpBonus==='number'?snap.mvpBonus:null)); if(__mvpBonus==null && g && typeof g.mvpBonus==='number'){ __mvpBonus=g.mvpBonus; }
       roster.forEach(function(r){
       var seat = r.seat;
@@ -10940,7 +10996,7 @@ saveState(); };
 (function(){
   // -- State
   var RoleFilter = window.RoleFilter = {
-    roles: ['Дон','Путана','Мафия','Гринч','Шантажист','Санта','Комиссар','Журналист','Врач','Камикадзе','Маньяк'],
+    roles: ['Дон','Путана','Мафия','Гринч','Шантажист','Санта','Комиссар','Журналист','Врач','Камикадзе','Маньяк','Телохранитель','Бронежилет'],
     selected: new Set(),
     applied: false,
     used: false,
@@ -11132,7 +11188,7 @@ saveState(); };
       _start();
       // After opened, hide groups not selected
       try{
-        var map = { 'Дон':'don', 'Путана':'hooker', 'Мафия':'mafia', 'Шантажист':'blackmailer', 'Комиссар':'sheriff', 'Журналист':'journalist', 'Врач':'doctor', 'Камикадзе':'kamikaze', 'Маньяк':'maniac' };
+        var map = { 'Дон':'don', 'Путана':'hooker', 'Мафия':'mafia', 'Шантажист':'blackmailer', 'Комиссар':'sheriff', 'Журналист':'journalist', 'Врач':'doctor', 'Камикадзе':'kamikaze', 'Маньяк':'maniac', 'Телохранитель':'bodyguard', 'Бронежилет':'vest' };
         document.querySelectorAll('#rolesWizard .role-group').forEach(function(box){
           var key = box.getAttribute('data-key');
           var shouldShow = false;
@@ -11171,7 +11227,7 @@ saveState(); };
       var cg = Data.state.currentGame;
       var players = (cg.players || []);
       function countAssigned(name){ return players.filter(function(p){ return p && p.role === name; }).length; }
-      var order = ['Дон','Путана','Санта','Комиссар','Журналист','Врач','Маньяк','Гринч','Мафия'];
+      var order = ['Дон','Путана','Санта','Комиссар','Журналист','Врач','Телохранитель','Бронежилет','Маньяк','Гринч','Мафия'];
       for (var i=0; i<order.length; i++){
         var roleName = order[i];
         if (RoleFilter.selected.has(roleName)){
@@ -11475,7 +11531,7 @@ if(!document.__bmOpenBound){
 
     RW._stepKeys = {
       1: ['don','hooker','mafia'],
-      2: ['sheriff','journalist','doctor','maniac']
+      2: ['sheriff','journalist','doctor','bodyguard','vest','maniac']
     };
     RW.step = 1;
     RW._N = 10;
@@ -11496,7 +11552,7 @@ if(!document.__bmOpenBound){
           return;
         }
         // инициализация
-        this.selections = { don:null, blackmailer:null, hooker:null, mafia:new Set(), sheriff:null, journalist:null, doctor:null, maniac:null, kamikaze:null };
+        this.selections = { don:null, blackmailer:null, hooker:null, mafia:new Set(), sheriff:null, journalist:null, doctor:null, maniac:null, kamikaze:null, bodyguard:null, vest:null };
         this.selectedBySeat = {};
         this._N = (cg.players && cg.players.length) ? cg.players.length : 10;
 
@@ -11534,7 +11590,7 @@ if(!document.__bmOpenBound){
       if (save) save.style.display = (this.step === 2) ? 'inline-block' : 'none';
     };
 
-    var roleNameMap = {don:'Дон', hooker:'Путана', mafia:'Мафия', sheriff:'Комиссар', journalist:'Журналист', doctor:'Врач', maniac:'Маньяк'};
+    var roleNameMap = {don:'Дон', hooker:'Путана', mafia:'Мафия', sheriff:'Комиссар', journalist:'Журналист', doctor:'Врач', maniac:'Маньяк', bodyguard:'Телохранитель', vest:'Бронежилет'};
 
     // сохраним оригинал render, если он понадобится
     var _renderOrig = RW.render ? RW.render.bind(RW) : null;
@@ -12351,7 +12407,7 @@ if(!document.__bmOpenBound){
         }
         return cnt;
       }
-      var order = ['Дон','Путана','Санта','Комиссар','Журналист','Врач','Маньяк','Гринч','Мафия'];
+      var order = ['Дон','Путана','Санта','Комиссар','Журналист','Врач','Телохранитель','Бронежилет','Маньяк','Гринч','Мафия'];
       var set = new Set(selected);
       for (var i = 0; i < order.length; i++){
         var name = order[i];
@@ -13133,6 +13189,37 @@ function updateBeginNight(){
     }
     return deepClone(l); // конфликт в одном и том же месте — побеждает этот ноутбук
   }
+  // Применить новую версию данных «на месте»: те же объекты остаются теми же,
+  // чтобы открытые окна (ночь, роли, таблица) продолжали работать с актуальными данными.
+  function assignInPlace(target, source){
+    if (Array.isArray(target) && Array.isArray(source)) {
+      const keyOf = (e) => (isPlainObj(e) ? (e.id != null ? "id:" + e.id : e.timestamp != null ? "ts:" + e.timestamp : e.seat != null ? "seat:" + e.seat : null) : null);
+      const pool = new Map();
+      target.forEach((e, i) => { const k = keyOf(e); pool.set(k != null ? k : "i:" + i, e); });
+      const out = source.map((e, i) => {
+        const k = keyOf(e); const old = pool.get(k != null ? k : "i:" + i);
+        if (isPlainObj(old) && isPlainObj(e)) { assignInPlace(old, e); return old; }
+        if (Array.isArray(old) && Array.isArray(e)) { assignInPlace(old, e); return old; }
+        return deepClone(e);
+      });
+      target.length = 0; out.forEach((e) => target.push(e));
+      return target;
+    }
+    if (isPlainObj(target) && isPlainObj(source)) {
+      Object.keys(target).forEach((k) => { if (!(k in source)) delete target[k]; });
+      Object.keys(source).forEach((k) => {
+        const a = target[k], b = source[k];
+        if ((isPlainObj(a) && isPlainObj(b)) || (Array.isArray(a) && Array.isArray(b))) assignInPlace(a, b);
+        else target[k] = deepClone(b);
+      });
+      return target;
+    }
+    return deepClone(source);
+  }
+  function applyState(next){
+    if (window.Data && Data.state && isPlainObj(Data.state) && isPlainObj(next)) assignInPlace(Data.state, next);
+    else { if (!window.Data) window.Data = {}; Data.state = next; }
+  }
   function refreshUiSafe(){
     try {
       if (window.UI && typeof UI.refreshAll === "function") UI.refreshAll();
@@ -13232,6 +13319,8 @@ function updateBeginNight(){
     ensureRole("Камикадзе", "red");
     ensureRole("Санта", "red");
     ensureRole("Гринч", "black");
+    ensureRole("Телохранитель", "red");
+    ensureRole("Бронежилет", "red");
 
     // остальное как было
     if (!Array.isArray(s.history)) s.history = [];
@@ -13243,6 +13332,8 @@ function updateBeginNight(){
     if (typeof P.maniacWin !== "number") {
       P.maniacWin = 10;
     }
+    if (typeof P.guardSaveShot !== "number") P.guardSaveShot = 0.5;
+    if (typeof P.guardLynchedDay1 !== "number") P.guardLynchedDay1 = -2;
   }
 
 
@@ -13366,7 +13457,7 @@ if (gateLoginBtn) {
             if (sameVal(remoteLive, localNow)) { syncBase = deepClone(remoteLive); return; }
             const merged = merge3(syncBase || remoteLive, localNow, remoteLive);
             syncBase = deepClone(remoteLive);
-            Data.state = merged;
+            applyState(merged);
             normalizeState();
 
             try {
@@ -13422,7 +13513,7 @@ if (gateLoginBtn) {
           // подтягиваем в этот ноутбук то, что пришло с других устройств, не теряя свежих правок отсюда
           const cur = (window.Data && Data.state) ? Data.state : {};
           if (!sameVal(saved, cur)) {
-            Data.state = merge3(localAtTx || cur, cur, saved);
+            applyState(merge3(localAtTx || cur, cur, saved));
             normalizeState();
             try { localStorage.setItem(LOCAL_KEY, JSON.stringify(Data.state)); } catch (_) {}
             refreshUiSafe();
@@ -13985,7 +14076,7 @@ if (gateLoginBtn) {
         var nights = rec.nights || [];
         for(var i=0;i<nights.length;i++){
           var st = nights[i] || {};
-          if((st.shot && !st.heal) || st.maniac){
+          if((NightRules.shotKills(st)) || st.maniac){
             return true;
           }
         }
@@ -14326,7 +14417,7 @@ if (gateLoginBtn) {
           var ns = r.nights || [];
           for(var j=0;j<ns.length;j++){
             var n = ns[j] || {};
-            if(n.shot || n.don || n.hook || n.santa || n.blackmail || n.sheriff || n.journalist || n.heal || n.maniac) return true;
+            if(n.shot || n.don || n.hook || n.santa || n.blackmail || n.sheriff || n.journalist || n.heal || n.guard || n.maniac) return true;
           }
         }
 
