@@ -1294,6 +1294,14 @@ td.col-player select.player-select{ flex:1; min-width: 0; }
                 <span>Камикадзе</span>
               </label>
               <label class="role-item">
+                <input type="checkbox" id="roleBodyguard">
+                <span>Телохранитель</span>
+              </label>
+              <label class="role-item">
+                <input type="checkbox" id="roleVest">
+                <span>Бронежилет</span>
+              </label>
+              <label class="role-item">
               <input type="checkbox" id="roleGrinch">
               <span>Гринч</span>
               </label>
@@ -1473,6 +1481,8 @@ td.col-player select.player-select{ flex:1; min-width: 0; }
             <div class="divider"></div>
 
             <div class="rule-row"><div class="rule-label">Санта нашёл Гринча (× живых на момент действия) (на будущее)</div><input id="ptsSantaFindGrinch" type="number" step="0.1"></div>
+            <div class="rule-row"><div class="rule-label">Телохранитель закрыл собой цель мафии (× живых на момент действия)</div><input id="ptsGuardSaveShot" type="number" step="0.1"></div>
+            <div class="rule-row"><div class="rule-label">Телохранитель заголосован в 1 день</div><input id="ptsGuardLynchedD1" type="number" step="0.1"></div>
           </div>
 
           <div class="inline-row" style="margin-top:12px; gap:10px;">
@@ -1711,6 +1721,8 @@ const liveStateRef = ref(db, `${MOB_DB_ROOT}/liveState`);
     const roleShantCheckbox = document.getElementById("roleShant");
     const roleManiacCheckbox = document.getElementById("roleManiac");
     const roleKamikazeCheckbox = document.getElementById("roleKamikaze");
+    const roleBodyguardCheckbox = document.getElementById("roleBodyguard");
+    const roleVestCheckbox = document.getElementById("roleVest");
     const applyRolesBtn = document.getElementById("applyRolesBtn");
 const assignRolesBtn = document.getElementById("assignRolesBtn");
 function syncJournalistEveryOtherUI() {
@@ -1942,6 +1954,7 @@ const NIGHT_STEPS_DEF = [
       { id: "komissar", label: "Комиссар" },
       { id: "journalist", label: "Журналист" },
       { id: "doctor", label: "Врач" },
+      { id: "bodyguard", label: "Телохранитель" },
       { id: "maniac", label: "Маньяк" },
     ];
 
@@ -1950,6 +1963,13 @@ const NIGHT_STEPS_DEF = [
     let currentNight = null;
     let lastPutanaTarget = null;
     let lastDoctorTarget = null;
+    // последняя цель Телохранителя (берём из журнала ночей, чтобы не хранить отдельно)
+    function getLastBodyguardTarget() {
+      try {
+        const l = (typeof nightLogs !== "undefined" && nightLogs.length) ? nightLogs[nightLogs.length - 1] : null;
+        return l && l.bodyguardTarget ? String(l.bodyguardTarget) : null;
+      } catch (_) { return null; }
+    }
     let lastJournalistPair = null;
     let lastJournalistPairNight = null;
     let lastJournalistCheckNight = null;
@@ -2007,6 +2027,7 @@ function autoSkipNightStep() {
       if (rc.komissar) steps.push("komissar");
       if (rc.journalist) steps.push("journalist");
       if (rc.doctor) steps.push("doctor");
+      if (rc.bodyguard) steps.push("bodyguard");
       if (rc.maniac) steps.push("maniac");
       return steps;
     }
@@ -2028,6 +2049,7 @@ function autoSkipNightStep() {
         journalistSkipped: false,
         journalistBlocked: false,
         doctorTarget: null,
+        bodyguardTarget: null,
         maniacTarget: null,
         bestMoveBonuses: { ...(bestMoveBonuses || {}) },
         bestMoveResult: lastBestMoveResult ? { ...(lastBestMoveResult || {}) } : null,
@@ -2188,6 +2210,8 @@ function setStarSeat(seat) {
       doctor: "Врач",
       maniac: "Маньяк",
       kamikaze: "Камикадзе",
+      bodyguard: "Телохранитель",
+      vest: "Бронежилет",
     };
 
     function getRoleLabelBySeat(seat) {
@@ -2919,6 +2943,29 @@ function finishNight() {
         toKill.add(String(maniacSeat));
       }
 
+      // Телохранитель и Бронежилет (защищают только от выстрела мафии; Врач — приоритетнее)
+      let bodyguardSaved = false;
+      let vestSavedNow = false;
+      const bodyguardSeatNow = getSeatByRoleId("bodyguard");
+      const vestSeatNow = getSeatByRoleId("vest");
+      try {
+        const healedShot = !!(doctorSeat && mafiaSeat && String(doctorSeat) === String(mafiaSeat));
+        const bgTarget = currentNight.bodyguardTarget;
+        const bgBlocked = !!(bodyguardSeatNow && currentNight.putanaTarget && String(currentNight.putanaTarget) === String(bodyguardSeatNow));
+        if (mafiaSeat && !healedShot && bodyguardSeatNow && bgTarget && !isSeatDead(bodyguardSeatNow) && !bgBlocked &&
+            String(bgTarget) === String(mafiaSeat) && String(bgTarget) !== String(bodyguardSeatNow)) {
+          if (!(maniacSeat && String(maniacSeat) === String(mafiaSeat))) toKill.delete(String(mafiaSeat));
+          toKill.add(String(bodyguardSeatNow));
+          bodyguardSaved = true;
+        }
+        const vestAlreadyUsed = nightLogs.some((l) => l && l.vestSaved);
+        if (!bodyguardSaved && mafiaSeat && !healedShot && vestSeatNow && String(vestSeatNow) === String(mafiaSeat) &&
+            !vestAlreadyUsed && !isSeatDead(vestSeatNow)) {
+          if (!(maniacSeat && String(maniacSeat) === String(vestSeatNow))) toKill.delete(String(vestSeatNow));
+          vestSavedNow = true;
+        }
+      } catch (_) {}
+
       const nightDeathSeats = Array.from(toKill);
 
       // Снимок мёртвых на НАЧАЛО ночи: роли действуют, даже если их убивают этой ночью
@@ -2977,7 +3024,7 @@ if (currentNight.putanaTarget) {
       const komissarTargetRoleId = currentNight.komissarTarget ? getRoleIdBySeatSafe(currentNight.komissarTarget) : null;
       const komissarTargetTeam = komissarTargetRoleId ? (komissarTargetRoleId === "grinch" ? "red" : teamForRoleId(komissarTargetRoleId)) : null;
 
-      const ACTIVE_HOOK_ROLES = new Set(["don", "mafia", "grinch", "putana", "shant", "santa", "komissar", "doctor", "journalist"]);
+      const ACTIVE_HOOK_ROLES = new Set(["don", "mafia", "grinch", "putana", "shant", "santa", "komissar", "doctor", "journalist", "bodyguard"]);
 
       const journalistTeams = (currentNight.journalistTargets || []).map(s => teamForRoleId(getRoleIdBySeatSafe(s)));
       const journalistDifferent = journalistTeams.length === 2 && journalistTeams[0] !== journalistTeams[1];
@@ -3000,6 +3047,12 @@ if (currentNight.putanaTarget) {
         journalistTargets: currentNight.journalistTargets || [],
         doctorTarget: currentNight.doctorTarget || null,
         maniacTarget: currentNight.maniacTarget || null,
+        bodyguardTarget: currentNight.bodyguardTarget || null,
+        bodyguardSeat: bodyguardSeatNow || null,
+        bodyguardPlayerId: bodyguardSeatNow ? getPlayerIdBySeat(bodyguardSeatNow) : null,
+        bodyguardSaved,
+        vestSeat: vestSeatNow || null,
+        vestSaved: vestSavedNow,
 
         // кто выполнял (по сидению)
         donSeat,
@@ -3073,7 +3126,7 @@ if (currentNight.journalistTargets && currentNight.journalistTargets.length === 
         if (!currentNight.mafiaTarget) {
           appendHistoryLine(`мафия: выстрела нет (действие не выбрано)`);
         } else {
-          const saved = currentNight.doctorTarget && String(currentNight.doctorTarget) === String(currentNight.mafiaTarget);
+          const saved = (currentNight.doctorTarget && String(currentNight.doctorTarget) === String(currentNight.mafiaTarget)) || bodyguardSaved || vestSavedNow;
           appendHistoryLine(`мафия ${saved ? "стреляет в" : "убивает"} игрока номер ${currentNight.mafiaTarget}${saved ? " (спасён)" : ""}`);
         }
       }
@@ -3162,6 +3215,16 @@ if (currentNight.journalistTargets && currentNight.journalistTargets.length === 
         }
       }
 
+      // Телохранитель
+      if (nightSteps.includes("bodyguard")) {
+        if (!logDeadOrBlocked("телохранитель", bodyguardSeatNow)) {
+          if (!currentNight.bodyguardTarget) appendHistoryLine(`телохранитель: действие не выбрано`);
+          else appendHistoryLine(`телохранитель охраняет игрока номер ${currentNight.bodyguardTarget}${bodyguardSaved ? " (закрыл собой — телохранитель погиб)" : ""}`);
+        }
+      }
+      // Бронежилет
+      if (vestSavedNow) appendHistoryLine(`бронежилет спас игрока номер ${vestSeatNow} от выстрела`);
+
       // Маньяк
       if (nightSteps.includes("maniac")) {
         const maniacRoleSeat = getSeatByRoleId("maniac");
@@ -3247,7 +3310,7 @@ function goToNextNightStepOrFinish() {
       const label = def ? def.label : stepId;
       try { captureNightStepSnapshot(nightStepIndex); } catch (_) {}
       let actingSeat = null;
-      if (["don","putana","santa","komissar","journalist","doctor","shant","maniac"].includes(stepId)) {
+      if (["don","putana","santa","komissar","journalist","doctor","bodyguard","shant","maniac"].includes(stepId)) {
         actingSeat = getSeatForRole(stepId);
       }
 
@@ -3403,8 +3466,14 @@ if (stepId === "journalist" && rolesConfig && rolesConfig.journalistEveryOther) 
         let disable = false;
 
         // базовая логика: большинство ролей не могут ходить по мёртвым
-        if (stepId === "mafia" || stepId === "putana" || stepId === "komissar" || stepId === "journalist" || stepId === "doctor" || stepId === "maniac") {
+        if (stepId === "mafia" || stepId === "putana" || stepId === "komissar" || stepId === "journalist" || stepId === "doctor" || stepId === "bodyguard" || stepId === "maniac") {
           if (isDead) disable = true;
+        }
+        // телохранитель не охраняет себя и не охраняет одного и того же игрока две ночи подряд
+        if (stepId === "bodyguard") {
+          if (actingSeat && String(seat) === String(actingSeat)) disable = true;
+          const _lastBg = getLastBodyguardTarget();
+          if (_lastBg && String(_lastBg) === String(seat)) disable = true;
         }
         // журналист не может проверять себя
         if (stepId === "journalist" && actingSeat && seat === actingSeat) {
@@ -4413,6 +4482,12 @@ function fadeVol(from, to, ms, then) {
               return;
             }
             currentNight.doctorTarget = seat;
+          } else if (stepId === "bodyguard") {
+            const _bgSelf = getSeatForRole("bodyguard");
+            if (_bgSelf && String(_bgSelf) === String(seat)) { alert("Телохранитель не может охранять себя."); return; }
+            const _lastBg = getLastBodyguardTarget();
+            if (_lastBg && String(_lastBg) === String(seat)) { alert("Телохранитель не может охранять одного и того же игрока две ночи подряд."); return; }
+            currentNight.bodyguardTarget = seat;
           } else if (stepId === "maniac") {
             currentNight.maniacTarget = seat;
           }
@@ -4509,6 +4584,8 @@ if (stepId === "journalist" && currentNight && rolesConfig && rolesConfig.journa
       kamikazeTakeBlack: -2,
 
       santaFindGrinch: 0.3,
+      guardSaveShot: 0.5,
+      guardLynchedDay1: -2,
     };
 
     // --- История игры (структурированная + текст) ---
@@ -4572,6 +4649,8 @@ if (stepId === "journalist" && currentNight && rolesConfig && rolesConfig.journa
       shant: false,
       maniac: false,
       kamikaze: false,
+      bodyguard: false,
+      vest: false,
     };
 
     // Цвета ролей
@@ -4587,6 +4666,8 @@ if (stepId === "journalist" && currentNight && rolesConfig && rolesConfig.journa
       santa: "red",
       maniac: "red",     // маньяк за красных
       kamikaze: "red",
+      bodyguard: "red",
+      vest: "red",
       citizen: "red",
     };
 
@@ -4830,6 +4911,8 @@ if (stepId === "journalist" && currentNight && rolesConfig && rolesConfig.journa
           grinch: !!rc.grinch,
           santa: !!rc.santa,
           kamikaze: !!rc.kamikaze,
+          bodyguard: !!rc.bodyguard,
+          vest: !!rc.vest,
         };
         roleDonCheckbox.checked = rolesConfig.don;
         rolePutanaCheckbox.checked = rolesConfig.putana;
@@ -4844,6 +4927,8 @@ if (stepId === "journalist" && currentNight && rolesConfig && rolesConfig.journa
         roleShantCheckbox.checked = rolesConfig.shant;
         roleManiacCheckbox.checked = rolesConfig.maniac;
         roleKamikazeCheckbox.checked = rolesConfig.kamikaze;
+        if (roleBodyguardCheckbox) roleBodyguardCheckbox.checked = !!rolesConfig.bodyguard;
+        if (roleVestCheckbox) roleVestCheckbox.checked = !!rolesConfig.vest;
 
 
         // --- Восстанавливаем критичные поля ДО rebuildGameTable (нужно для подсветок и кнопки "ЛХ" сразу при построении таблицы) ---
@@ -5242,6 +5327,8 @@ function scheduleLiveSave() {
         ptsKamikazeTakeRed: "kamikazeTakeRed",
         ptsKamikazeTakeBlack: "kamikazeTakeBlack",
         ptsSantaFindGrinch: "santaFindGrinch",
+        ptsGuardSaveShot: "guardSaveShot",
+        ptsGuardLynchedD1: "guardLynchedDay1",
       };
       for (const [inputId, key] of Object.entries(map)) {
         const el = document.getElementById(inputId);
@@ -5282,6 +5369,8 @@ function scheduleLiveSave() {
         kamikazeTakeBlack: readNum("ptsKamikazeTakeBlack", rulesPoints.kamikazeTakeBlack),
 
         santaFindGrinch: readNum("ptsSantaFindGrinch", rulesPoints.santaFindGrinch),
+        guardSaveShot: readNum("ptsGuardSaveShot", (rulesPoints.guardSaveShot == null ? 0.5 : rulesPoints.guardSaveShot)),
+        guardLynchedDay1: readNum("ptsGuardLynchedD1", (rulesPoints.guardLynchedDay1 == null ? -2 : rulesPoints.guardLynchedDay1)),
       };
     }
 
@@ -5391,6 +5480,11 @@ function scheduleLiveSave() {
           const dPid = nlog.doctorPlayerId || (dSeat ? getPlayerIdBySeat(dSeat) : null);
           add(dPid, (P.doctorSaveShot || 0) * alive);
         }
+        if (nlog.bodyguardSaved) {
+          const gSeat = nlog.bodyguardSeat || getSeatByRoleId("bodyguard");
+          const gPid = nlog.bodyguardPlayerId || (gSeat ? getPlayerIdBySeat(gSeat) : null);
+          add(gPid, (P.guardSaveShot == null ? 0.5 : P.guardSaveShot) * alive);
+        }
         if (nlog.shantFoundJournalist) {
           const bSeat = nlog.shantSeat || getSeatByRoleId("shant");
           const bPid = nlog.shantPlayerId || (bSeat ? getPlayerIdBySeat(bSeat) : null);
@@ -5414,6 +5508,7 @@ function scheduleLiveSave() {
         if (dlog.eliminatedRoleId === "doctor") add(pid, (P.doctorLynchedDay1 || 0));
         if (dlog.eliminatedRoleId === "komissar" || dlog.eliminatedRoleId === "sheriff") add(pid, (P.sheriffLynchedDay1 || 0));
         if (dlog.eliminatedRoleId === "journalist") add(pid, (P.journalistLynchedDay1 || 0));
+        if (dlog.eliminatedRoleId === "bodyguard") add(pid, (P.guardLynchedDay1 == null ? -2 : P.guardLynchedDay1));
       }
 
       // Камикадзе
@@ -5465,6 +5560,8 @@ function getActiveRoleOptions() {
       if (rolesConfig.shant) roles.push({ id: "shant", label: "Шантажист" });
       if (rolesConfig.maniac) roles.push({ id: "maniac", label: "Маньяк" });
       if (rolesConfig.kamikaze) roles.push({ id: "kamikaze", label: "Камикадзе" });
+      if (rolesConfig.bodyguard) roles.push({ id: "bodyguard", label: "Телохранитель" });
+      if (rolesConfig.vest) roles.push({ id: "vest", label: "Бронежилет" });
 
       roles.push({ id: "citizen", label: "Мирный" });
 
@@ -6115,6 +6212,8 @@ function updateFoulRowStyle(rowEl) {
       if (rc.shant)      required.push({ type: "single", id: "shant" });
       if (rc.maniac)     required.push({ type: "single", id: "maniac" });
       if (rc.kamikaze)   required.push({ type: "single", id: "kamikaze" });
+      if (rc.bodyguard)  required.push({ type: "single", id: "bodyguard" });
+      if (rc.vest)       required.push({ type: "single", id: "vest" });
 
       if (required.length === 0) {
         nightWizardBtn.disabled = true;
@@ -6244,6 +6343,8 @@ function updateFoulRowStyle(rowEl) {
       rolesConfig.shant = roleShantCheckbox.checked;
       rolesConfig.maniac = roleManiacCheckbox.checked;
       rolesConfig.kamikaze = roleKamikazeCheckbox.checked;
+      rolesConfig.bodyguard = !!(roleBodyguardCheckbox && roleBodyguardCheckbox.checked);
+      rolesConfig.vest = !!(roleVestCheckbox && roleVestCheckbox.checked);
 
       rebuildGameTable({ preservePlayers: true, preserveDetails: true });
       updateNightButtonState();
@@ -6270,6 +6371,8 @@ function updateFoulRowStyle(rowEl) {
         if (rolesConfig.shant) list.push("shant");
         if (rolesConfig.maniac) list.push("maniac");
         if (rolesConfig.kamikaze) list.push("kamikaze");
+        if (rolesConfig.bodyguard) list.push("bodyguard");
+        if (rolesConfig.vest) list.push("vest");
         return list;
       },
 
@@ -6286,6 +6389,8 @@ function updateFoulRowStyle(rowEl) {
           "Шантажист": "shant",
           "Маньяк": "maniac",
           "Камикадзе": "kamikaze",
+          "Телохранитель": "bodyguard",
+          "Бронежилет": "vest",
           "Мирный": "citizen",
         };
         return map[v] || v;
@@ -6342,7 +6447,7 @@ function updateFoulRowStyle(rowEl) {
           cost += 0.6 * peacefulCnt;
         }
 
-        const activeSet = new Set(["komissar", "don", "putana", "doctor", "journalist", "maniac", "shant", "mafia"]);
+        const activeSet = new Set(["komissar", "don", "putana", "doctor", "journalist", "maniac", "shant", "mafia", "bodyguard"]);
         const activeCount = recent.filter((r) => activeSet.has(r.role)).length;
         if (activeSet.has(role)) {
           cost -= 0.5 * Math.max(0, w - activeCount);
@@ -6669,6 +6774,8 @@ if (assignRolesBtn) {
         rolesConfig.shant = roleShantCheckbox.checked;
         rolesConfig.maniac = roleManiacCheckbox.checked;
         rolesConfig.kamikaze = roleKamikazeCheckbox.checked;
+      rolesConfig.bodyguard = !!(roleBodyguardCheckbox && roleBodyguardCheckbox.checked);
+      rolesConfig.vest = !!(roleVestCheckbox && roleVestCheckbox.checked);
 
         rebuildGameTable({ preservePlayers: true, preserveDetails: true });
 
@@ -6724,6 +6831,8 @@ if (assignRolesBtn) {
         shant: false,
         maniac: false,
         kamikaze: false,
+        bodyguard: false,
+        vest: false,
       };
 
       // замочек в дефолт (открыт)
@@ -6829,7 +6938,7 @@ if (assignRolesBtn) {
         });
 
         const mafiaLimit = Math.max(0, Math.min(4, rolesConfig.mafiaCount || 0));
-        const uniqueRoles = ["don", "putana", "grinch", "santa", "komissar", "journalist", "doctor", "shant", "maniac", "kamikaze"];
+        const uniqueRoles = ["don", "putana", "grinch", "santa", "komissar", "journalist", "doctor", "shant", "maniac", "kamikaze", "bodyguard", "vest"];
 
         let allowed = true;
         if (newRole === "mafia" && mafiaLimit > 0 && counts["mafia"] >= mafiaLimit) {
@@ -6938,6 +7047,8 @@ if (assignRolesBtn) {
         shant: false,
         maniac: false,
         kamikaze: false,
+        bodyguard: false,
+        vest: false,
       };
 
       // замочек в дефолт (открыт)
