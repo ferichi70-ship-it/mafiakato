@@ -13068,6 +13068,8 @@ function updateBeginNight(){
 
   // Флаг, чтобы подписку onValue повесить только один раз
   let firebaseListenerAttached = false;
+  // Пока данные из базы не загружены, НЕ отправляем в базу ничего (иначе старая/пустая копия с ноутбука затрёт базу)
+  let firebaseLoaded = false;
 
   const DB_PATH  = "words/state";                // где в БД лежит состояние
   const LOCAL_KEY = "mafia-scorekeeper-v4.8";    // твой ключ локального хранилища
@@ -13319,6 +13321,7 @@ if (gateLoginBtn) {
         firebaseListenerAttached = true;
       }
 
+      firebaseLoaded = true;
       if (!initial) console.log("Firebase: состояние загружено");
       return true;
     } catch (e) {
@@ -13334,6 +13337,11 @@ if (gateLoginBtn) {
     const user = auth.currentUser;
     if (!user) {
       if (showMsg) alert("Нужно войти, чтобы сохранять изменения.");
+      return;
+    }
+    if (!firebaseLoaded) {
+      // данные из базы ещё не загрузились — не затираем базу
+      if (showMsg) alert("Данные ещё загружаются из базы, попробуйте через пару секунд.");
       return;
     }
     normalizeState();

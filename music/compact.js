@@ -15,16 +15,21 @@
   function size(x) { try { return JSON.stringify(x).length; } catch (_) { return 0; } }
   function mb(n) { return (n / 1e6).toFixed(2) + ' МБ'; }
 
+  // Firebase не принимает undefined — убираем пустые поля
+  function clean(o) {
+    Object.keys(o).forEach(function (k) { if (o[k] === undefined || (typeof o[k] === 'number' && !isFinite(o[k]))) delete o[k]; });
+    return o;
+  }
   function compactGame(g) {
-    return {
+    return clean({
       date: g.date, number: g.number, num: g.num, name: g.name,
       timestamp: g.timestamp, winnerTeam: g.winnerTeam,
-      mvpId: g.mvpId || null, mvpBonus: g.mvpBonus || 0,
+      mvpId: g.mvpId || '', mvpBonus: g.mvpBonus || 0,
       compacted: true,
       players: (g.players || []).map(function (p) {
-        return { playerId: p.playerId || '', seat: p.seat, role: p.role || '', team: p.team || '', score: (typeof p.score === 'number' ? p.score : 0) };
+        return clean({ playerId: p.playerId || '', seat: p.seat, role: p.role || '', team: p.team || '', score: (typeof p.score === 'number' ? p.score : 0) });
       })
-    };
+    });
   }
 
   function plan(D) {
