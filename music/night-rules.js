@@ -108,6 +108,11 @@
     try {
       var cg = (window.Data && Data.state) ? Data.state.currentGame : null;
       if (!cg || !cg.grid) return;
+      // В игре нет Телохранителя и Бронежилета — пересчитывать нечего (раз очистим старые отметки и выходим)
+      if (!hasRole(cg, GUARD_ROLE) && !hasRole(cg, VEST_ROLE)) {
+        if (lastCg !== cg || lastSig !== 'none') { recompute(cg); lastCg = cg; lastSig = 'none'; }
+        return;
+      }
       var sig = signature(cg);
       if (cg === lastCg && sig === lastSig) return;
       recompute(cg);
