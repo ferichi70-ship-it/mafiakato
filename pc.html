@@ -10798,11 +10798,10 @@ function next(){
       }
       if(!playlist.length) return;
       playlist.sort(function(a,b){ return naturalCmp(a.title||filename(a.url), b.title||filename(b.url)); });
-      playlist.forEach(function(tr,i){
-        var a = new Audio(); a.preload='metadata'; a.src = tr.url;
-        a.addEventListener('loadedmetadata', function(){
-          if(isFinite(a.duration)){ playlist[i].durSec = a.duration; render(); }
-        }, {once:true});
+      // Длительности берём из music/night-start.js (TRACK_DUR), а не качаем все треки сразу.
+      playlist.forEach(function(tr){
+        var n = filename(tr.url);
+        if (window.TRACK_DUR && window.TRACK_DUR[n]) tr.durSec = window.TRACK_DUR[n];
       });
       if(idx<0) idx=0;
       render();
