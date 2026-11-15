@@ -104,10 +104,34 @@
     return parts.join(';');
   }
 
+  // Data объявлен на странице как const — берём его по имени
+  function getData() {
+    try { if (typeof Data !== 'undefined') return Data; } catch (_) {}
+    return window.Data;
+  }
+  // Проверяем не чаще одного раза за действие: в пределах одной отрисовки сетка не меняется.
+  // Любое сохранение (Data.save) сбрасывает кэш — значит, после изменения отметок пересчёт будет сразу.
+  var checkedThisTurn = false;
+  function invalidate() { checkedThisTurn = false; }
+  function hookSave(D) {
+    try {
+      if (!D || typeof D.save !== 'function' || D.save.__nrHooked) return;
+      var orig = D.save;
+      var w = function () { invalidate(); try { return orig.apply(this, arguments); } finally { invalidate(); } };
+      w.__nrHooked = true;
+      D.save = w;
+    } catch (_) {}
+  }
+
   function ensure() {
     try {
-      var cg = (window.Data && Data.state) ? Data.state.currentGame : null;
+      var D = getData();
+      hookSave(D);
+      var cg = (D && D.state) ? D.state.currentGame : null;
       if (!cg || !cg.grid) return;
+      if (checkedThisTurn && cg === lastCg) return;
+      checkedThisTurn = true;
+      Promise.resolve().then(invalidate);
       // В игре нет Телохранителя и Бронежилета — пересчитывать нечего (раз очистим старые отметки и выходим)
       if (!hasRole(cg, GUARD_ROLE) && !hasRole(cg, VEST_ROLE)) {
         if (lastCg !== cg || lastSig !== 'none') { recompute(cg); lastCg = cg; lastSig = 'none'; }
